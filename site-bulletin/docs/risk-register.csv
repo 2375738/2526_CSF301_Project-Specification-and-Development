@@ -1,0 +1,4 @@
+Risk,Probability,Impact,Mitigation,Owner,Status
+Time overrun,Medium,High,Scope control + weekly milestones,Vladimir,Open
+Dependency updates,Low,Medium,Lock versions + smoke tests,Vladimir,Open
+Data privacy,Low,High,Use synthetic placeholders only,Vladimir,Open

@@ -1,0 +1,15 @@
+# Dissertation Outline (Skeleton)
+- Title Page
+- Abstract (150-250 words)
+- Introduction (problem, context, aims, SMART objectives)
+- Background & Related Work
+- Method / Software Life Cycle (process, milestones, risks)
+- Requirements (functional & non-functional, acceptance criteria)
+- Design & Architecture (diagrams, data model)
+- Implementation (stack choices, modules, tricky parts)
+- Testing (strategy, cases, coverage, evidence)
+- Evaluation (results vs aims, performance/usability)
+- Future Work
+- Conclusion
+- References
+- Appendices (user guide, setup, screenshots)
