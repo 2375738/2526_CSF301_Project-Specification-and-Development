@@ -53,4 +53,28 @@ class CategoryResource extends Resource
             'edit' => EditCategory::route('/{record}/edit'),
         ];
     }
+
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        return $user?->hasRole('manager', 'ops_manager', 'hr', 'admin') ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        return $user?->hasRole('hr', 'admin', 'manager', 'ops_manager') ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return static::canCreate();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasRole('hr', 'admin') ?? false;
+    }
 }

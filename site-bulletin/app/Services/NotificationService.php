@@ -42,6 +42,13 @@ class NotificationService
         ]);
     }
 
+    public function analyticsDigestGenerated(string $path): void
+    {
+        $this->log('analytics.digest', [
+            'path' => $path,
+        ]);
+    }
+
     protected function log(string $event, array $context = []): void
     {
         Log::info("[notifications] {$event}", $context);

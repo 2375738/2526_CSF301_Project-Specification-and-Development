@@ -18,16 +18,20 @@ class TicketPolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->hasRole('employee', 'manager', 'admin');
+        return $user->hasRole('employee', 'manager', 'ops_manager', 'hr', 'admin');
     }
 
     public function view(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager()) {
+        if ($user->isManager() || $user->isHr()) {
             return ! $ticket->isPrivateTo($user);
         }
 
-        if ($ticket->requester_id === $user->id || $ticket->assignee_id === $user->id) {
+        if (
+            $ticket->requester_id === $user->id
+            || $ticket->assignee_id === $user->id
+            || $ticket->created_for_id === $user->id
+        ) {
             return true;
         }
 
@@ -36,12 +40,12 @@ class TicketPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole('employee', 'manager');
+        return $user->hasRole('employee', 'manager', 'ops_manager', 'hr');
     }
 
     public function update(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager()) {
+        if ($user->isManager() || $user->isHr()) {
             return ! $ticket->isPrivateTo($user);
         }
 
@@ -50,11 +54,11 @@ class TicketPolicy
 
     public function comment(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager()) {
+        if ($user->isManager() || $user->isHr()) {
             return ! $ticket->isPrivateTo($user);
         }
 
-        return $ticket->requester_id === $user->id;
+        return $ticket->requester_id === $user->id || $ticket->created_for_id === $user->id;
     }
 
     public function upload(User $user, Ticket $ticket): bool
@@ -64,10 +68,10 @@ class TicketPolicy
 
     public function close(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager()) {
+        if ($user->isManager() || $user->isHr()) {
             return true;
         }
 
-        return $ticket->requester_id === $user->id;
+        return $ticket->requester_id === $user->id || $ticket->created_for_id === $user->id;
     }
 }

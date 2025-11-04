@@ -21,8 +21,17 @@
               <p>Location: <span class="font-medium text-slate-800">{{ $ticket->location }}</span></p>
             @endif
             <p>Opened by {{ $ticket->requester->name }} on {{ $ticket->created_at->format('M j, Y H:i') }}</p>
-            @if ($ticket->assignee)
-              <p>Assigned to {{ $ticket->assignee->name }}</p>
+            @if ($ticket->createdFor && $ticket->created_for_id !== $ticket->requester_id)
+              <p>Raised for <span class="font-medium text-slate-800">{{ $ticket->createdFor->name }}</span></p>
+            @endif
+            @if ($ticket->department)
+              <p>Department: <span class="font-medium text-slate-800">{{ $ticket->department->name }}</span></p>
+            @endif
+           @if ($ticket->assignee)
+             <p>Assigned to {{ $ticket->assignee->name }}</p>
+           @endif
+            @if (($ticket->sla_first_response_breached ?? false) || ($ticket->sla_resolution_breached ?? false))
+              <p class="mt-1 text-sm font-semibold text-rose-600">SLA warning: attention required</p>
             @endif
             @if ($ticket->duplicateOf)
               <p class="text-amber-700 font-medium">
@@ -47,6 +56,32 @@
 
     <div class="grid gap-6 md:grid-cols-3">
       <div class="md:col-span-2 space-y-6">
+        <section class="bg-white shadow-sm rounded-xl px-6 py-5">
+          <h2 class="text-lg font-semibold text-slate-900">Service Targets</h2>
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 px-4 py-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">First response</p>
+              <p class="mt-1 text-sm text-slate-700">
+                {{ $sla['first_response_minutes'] ?? '—' }} mins
+                <span class="text-xs text-slate-500">(target {{ $sla['targets']['first_response_minutes'] }} mins)</span>
+              </p>
+              @if ($sla['first_response_breached'])
+                <span class="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-700">Breached</span>
+              @endif
+            </div>
+            <div class="rounded-lg border border-slate-200 px-4 py-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Resolution active time</p>
+              <p class="mt-1 text-sm text-slate-700">
+                {{ $sla['resolution_active_minutes'] }} mins
+                <span class="text-xs text-slate-500">(target {{ $sla['targets']['resolution_minutes'] }} mins)</span>
+              </p>
+              @if ($sla['resolution_breached'])
+                <span class="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-700">Breached</span>
+              @endif
+            </div>
+          </div>
+        </section>
+
         <section class="bg-white shadow-sm rounded-xl px-6 py-5">
           <h2 class="text-lg font-semibold text-slate-900">Status Timeline</h2>
           <ul class="mt-4 space-y-4">
@@ -104,7 +139,7 @@
                 Add an update
                 <textarea name="body" rows="4" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" required>{{ old('body') }}</textarea>
               </label>
-              @if (auth()->user()->hasRole('manager', 'admin'))
+              @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
                 <label class="inline-flex items-center gap-2 text-sm text-slate-600">
                   <input type="checkbox" name="is_private" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                   Private note (requester cannot see)
@@ -174,7 +209,7 @@
           @endcan
         </section>
 
-        @if (auth()->user()->hasRole('manager', 'admin'))
+        @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
           <section class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-4">
             <h2 class="text-lg font-semibold text-slate-900">Triage &amp; Assign</h2>
             <form action="{{ route('tickets.status.update', $ticket) }}" method="POST" class="space-y-3 text-sm text-slate-700">
@@ -203,7 +238,12 @@
                 <select name="assignee_id" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
                   <option value="">Unassigned</option>
                   @foreach ($assignableUsers as $user)
-                    <option value="{{ $user->id }}" @selected($ticket->assignee_id === $user->id)>{{ $user->name }} ({{ ucfirst($user->role) }})</option>
+                    <option value="{{ $user->id }}" @selected($ticket->assignee_id === $user->id)>
+                      {{ $user->name }}
+                      (
+                        {{ $user->role instanceof \App\Enums\UserRole ? $user->role->label() : ucfirst($user->role) }}
+                      )
+                    </option>
                   @endforeach
                 </select>
               </label>

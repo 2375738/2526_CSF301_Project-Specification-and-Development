@@ -47,6 +47,22 @@
             @endif
         </div>
 
+        <div>
+            <x-input-label :value="__('Role')" />
+            <p class="mt-1 text-sm text-gray-700">
+                {{ $user->role instanceof \App\Enums\UserRole ? $user->role->label() : ucfirst($user->role) }}
+            </p>
+        </div>
+
+        @if ($user->primaryDepartment)
+            <div>
+                <x-input-label :value="__('Primary Department')" />
+                <p class="mt-1 text-sm text-gray-700">
+                    {{ $user->primaryDepartment->name }}
+                </p>
+            </div>
+        @endif
+
         <div class="flex items-center gap-4">
             <x-primary-button>{{ __('Save') }}</x-primary-button>
 

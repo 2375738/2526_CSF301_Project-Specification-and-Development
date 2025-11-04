@@ -19,6 +19,8 @@ class Ticket extends Model
         'requester_id',
         'assignee_id',
         'category_id',
+        'created_for_id',
+        'department_id',
         'duplicate_of_id',
         'priority',
         'status',
@@ -26,17 +28,30 @@ class Ticket extends Model
         'description',
         'location',
         'closed_at',
+        'sla_first_response_breached',
+        'sla_resolution_breached',
+        'notified_first_response_breach',
+        'notified_resolution_breach',
     ];
 
     protected $casts = [
         'priority' => TicketPriority::class,
         'status' => TicketStatus::class,
         'closed_at' => 'datetime',
+        'sla_first_response_breached' => 'boolean',
+        'sla_resolution_breached' => 'boolean',
+        'notified_first_response_breach' => 'boolean',
+        'notified_resolution_breach' => 'boolean',
     ];
 
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requester_id');
+    }
+
+    public function createdFor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_for_id');
     }
 
     public function assignee(): BelongsTo
@@ -47,6 +62,11 @@ class Ticket extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function comments(): HasMany
@@ -154,6 +174,6 @@ class Ticket extends Model
             return false;
         }
 
-        return $this->category->is_sensitive && ! $user->hasRole('manager', 'admin');
+        return $this->category->is_sensitive && ! $user->hasRole('manager', 'ops_manager', 'hr', 'admin');
     }
 }

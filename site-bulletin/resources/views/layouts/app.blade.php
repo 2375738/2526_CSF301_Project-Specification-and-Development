@@ -15,6 +15,10 @@
           <a href="{{ route('home') }}" class="text-slate-600 hover:text-slate-900">Dashboard</a>
           @auth
             <a href="{{ route('tickets.index') }}" class="text-slate-600 hover:text-slate-900">My Tickets</a>
+            @if (auth()->user()->hasRole('manager','ops_manager','hr','admin'))
+              <a href="{{ route('governance.index') }}" class="text-slate-600 hover:text-slate-900">Governance</a>
+            @endif
+            <a href="{{ route('profile.edit') }}" class="text-slate-600 hover:text-slate-900">Profile</a>
             @if (auth()->user()->isEmployee())
               <a href="{{ route('tickets.create') }}" class="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-white hover:bg-blue-700">
                 Report Issue

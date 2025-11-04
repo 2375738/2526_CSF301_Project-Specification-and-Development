@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Enums\UserRole;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -21,12 +22,16 @@ class UserForm
                     ->required()
                     ->unique(table: 'users', column: 'email', ignoreRecord: true),
                 Select::make('role')
-                    ->options([
-                        'employee' => 'Employee',
-                        'manager' => 'Manager',
-                        'admin' => 'Admin',
-                    ])
-                    ->required(),
+                    ->options(UserRole::options())
+                    ->required()
+                    ->native(false),
+                Select::make('primary_department_id')
+                    ->relationship('primaryDepartment', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->label('Primary Department')
+                    ->placeholder('Assign department')
+                    ->columnSpanFull(),
                 TextInput::make('password')
                     ->password()
                     ->revealable()

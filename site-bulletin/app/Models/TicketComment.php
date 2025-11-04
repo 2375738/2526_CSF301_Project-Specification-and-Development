@@ -34,7 +34,7 @@ class TicketComment extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->hasRole('manager', 'admin')) {
+        if ($user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
             return $query;
         }
 

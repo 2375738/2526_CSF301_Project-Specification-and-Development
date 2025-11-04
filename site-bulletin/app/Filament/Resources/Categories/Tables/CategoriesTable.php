@@ -24,6 +24,14 @@ class CategoriesTable
                 IconColumn::make('is_sensitive')
                     ->boolean()
                     ->label('Sensitive'),
+                TextColumn::make('audience')
+                    ->badge()
+                    ->label('Audience')
+                    ->formatStateUsing(fn ($state) => ucfirst($state)),
+                TextColumn::make('department.name')
+                    ->label('Department')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()

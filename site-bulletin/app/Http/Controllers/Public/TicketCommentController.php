@@ -19,7 +19,7 @@ class TicketCommentController extends Controller
         $this->authorize('comment', $ticket);
 
         $user = $request->user();
-        $isPrivate = $request->boolean('is_private') && $user->hasRole('manager', 'admin');
+        $isPrivate = $request->boolean('is_private') && $user->hasRole('manager', 'ops_manager', 'hr', 'admin');
 
         $comment = $ticket->comments()->create([
             'user_id' => $user->id,

@@ -8,6 +8,8 @@ use App\Enums\TicketStatus;
 use App\Http\Requests\StoreTicketRequest;
 use App\Models\Category;
 use App\Models\Ticket;
+use App\Models\Department;
+use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\SLAService;
 use Illuminate\Http\RedirectResponse;
@@ -22,19 +24,43 @@ class ReportTicketController extends Controller
     {
         $this->authorize('create', Ticket::class);
 
+        $user = $request->user();
         $categories = Category::orderBy('order')->get();
         $title = old('title', $request->query('title'));
         $categoryId = (int) old('category_id', $request->query('category_id'));
 
         $similarTickets = $this->similarTickets(
-            $request->user(),
+            $user,
             $title,
             $categoryId ?: null
         );
 
+        $canActOnBehalf = $user->hasRole('manager', 'ops_manager', 'hr', 'admin');
+        $employeeOptions = collect();
+        $departmentOptions = collect();
+
+        if ($canActOnBehalf) {
+            $departmentQuery = Department::query()->orderBy('name');
+            $employeeQuery = User::query()->orderBy('name');
+
+            if ($user->hasRole('hr', 'admin', 'ops_manager')) {
+                // no restrictions
+            } else {
+                $managedIds = $user->managedDepartments()->pluck('departments.id');
+                $departmentQuery->whereIn('id', $managedIds);
+                $employeeQuery->whereHas('departments', fn ($q) => $q->whereIn('departments.id', $managedIds));
+            }
+
+            $departmentOptions = $departmentQuery->get(['id', 'name']);
+            $employeeOptions = $employeeQuery->get(['id', 'name']);
+        }
+
         return view('tickets.report', [
             'categories' => $categories,
             'similarTickets' => $similarTickets,
+            'canActOnBehalf' => $canActOnBehalf,
+            'employeeOptions' => $employeeOptions,
+            'departmentOptions' => $departmentOptions,
         ]);
     }
 
@@ -45,8 +71,45 @@ class ReportTicketController extends Controller
     ): RedirectResponse {
         $user = $request->user();
 
+        $canActOnBehalf = $user->hasRole('manager', 'ops_manager', 'hr', 'admin');
+        $createdFor = null;
+
+        if ($canActOnBehalf && $request->filled('created_for_id')) {
+            $createdFor = User::findOrFail($request->integer('created_for_id'));
+
+            if (! $user->hasRole('hr', 'admin', 'ops_manager')) {
+                $managedIds = $user->managedDepartments()->pluck('departments.id');
+                abort_unless($createdFor->departments()->whereIn('departments.id', $managedIds)->exists(), 403);
+            }
+        } elseif (! $canActOnBehalf) {
+            $createdFor = $user;
+        }
+
+        if (! $createdFor) {
+            $createdFor = $user;
+        }
+
+        $departmentId = null;
+
+        if ($request->filled('department_id')) {
+            $department = Department::findOrFail($request->integer('department_id'));
+
+            if (! $user->hasRole('hr', 'admin', 'ops_manager')) {
+                $managedIds = $user->managedDepartments()->pluck('departments.id');
+                abort_unless($managedIds->contains($department->id), 403);
+            }
+
+            $departmentId = $department->id;
+        }
+
+        if (! $departmentId) {
+            $departmentId = $createdFor?->primary_department_id ?? $user->primary_department_id;
+        }
+
         $ticket = Ticket::create([
             'requester_id' => $user->id,
+            'created_for_id' => $createdFor?->id,
+            'department_id' => $departmentId,
             'category_id' => $request->integer('category_id'),
             'priority' => TicketPriority::Medium->value,
             'status' => TicketStatus::New->value,
@@ -76,6 +139,13 @@ class ReportTicketController extends Controller
                 'size' => $file->getSize(),
             ]);
         }
+
+        $slaEvaluation = $slaService->evaluate($ticket);
+
+        $ticket->forceFill([
+            'sla_first_response_breached' => $slaEvaluation['first_response_breached'],
+            'sla_resolution_breached' => $slaEvaluation['resolution_breached'],
+        ])->save();
 
         $notifier->ticketCreated($ticket);
 
@@ -146,7 +216,7 @@ class ReportTicketController extends Controller
                 $q->orWhere('title', 'like', '%' . $word . '%');
             }
 
-            if ($user && ! $user->hasRole('manager', 'admin')) {
+            if ($user && ! $user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
                 $q->orWhere('requester_id', $user->id);
             }
         });

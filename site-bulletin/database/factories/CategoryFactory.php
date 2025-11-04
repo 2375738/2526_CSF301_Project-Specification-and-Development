@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Department;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,10 +17,16 @@ class CategoryFactory extends Factory
      */
     public function definition(): array
     {
+        $audience = $this->faker->boolean(30) ? 'department' : 'all';
+
         return [
             'name' => $this->faker->unique()->words(2, true),
             'order' => $this->faker->numberBetween(0, 10),
             'is_sensitive' => false,
+            'audience' => $audience,
+            'department_id' => $audience === 'department'
+                ? Department::query()->inRandomOrder()->value('id')
+                : null,
         ];
     }
 }

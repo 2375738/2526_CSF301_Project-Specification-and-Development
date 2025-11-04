@@ -48,6 +48,10 @@ class TicketAttachmentController extends Controller
 
         $this->authorize('view', $ticket);
 
+        if (! Storage::disk($attachment->disk)->exists($attachment->path)) {
+            abort(404, 'Attachment file not found');
+        }
+
         return Storage::disk($attachment->disk)->download(
             $attachment->path,
             $attachment->original_name

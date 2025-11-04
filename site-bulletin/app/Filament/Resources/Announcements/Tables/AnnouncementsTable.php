@@ -17,6 +17,18 @@ class AnnouncementsTable
             ->columns([
                 TextColumn::make('title')
                     ->searchable(),
+                TextColumn::make('author.name')
+                    ->label('Author')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('department.name')
+                    ->label('Department')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('audience')
+                    ->badge()
+                    ->label('Audience')
+                    ->formatStateUsing(fn ($state) => ucfirst($state)),
                 TextColumn::make('starts_at')
                     ->dateTime()
                     ->sortable(),

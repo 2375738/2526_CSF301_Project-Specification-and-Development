@@ -12,6 +12,37 @@
     <form action="{{ route('tickets.store') }}" method="POST" enctype="multipart/form-data" class="bg-white shadow-sm rounded-xl px-6 py-6 space-y-5">
       @csrf
 
+      @if ($canActOnBehalf)
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block text-sm font-medium text-slate-700">
+            Employee
+            <select name="created_for_id" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+              <option value="">Select employee...</option>
+              @foreach ($employeeOptions as $employee)
+                <option value="{{ $employee->id }}" @selected(old('created_for_id') == $employee->id)>{{ $employee->name }}</option>
+              @endforeach
+            </select>
+            <span class="mt-1 block text-xs text-slate-500">Choose who this ticket is for. Leave blank to keep it assigned to you.</span>
+            @error('created_for_id')
+              <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
+            @enderror
+          </label>
+
+          <label class="block text-sm font-medium text-slate-700">
+            Department (optional)
+            <select name="department_id" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+              <option value="">Auto-select from employee</option>
+              @foreach ($departmentOptions as $department)
+                <option value="{{ $department->id }}" @selected(old('department_id') == $department->id)>{{ $department->name }}</option>
+              @endforeach
+            </select>
+            @error('department_id')
+              <span class="mt-1 block text-xs text-rose-600">{{ $message }}</span>
+            @enderror
+          </label>
+        </div>
+      @endif
+
       <div class="grid gap-4 md:grid-cols-2">
         <label class="block text-sm font-medium text-slate-700">
           Category

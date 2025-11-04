@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\Department;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,6 +23,11 @@ class AnnouncementFactory extends Factory
             ? $this->faker->optional(0.5)->dateTimeBetween($start, (clone $start)->modify('+7 days'))
             : null;
 
+        $audience = $this->faker->randomElement(['all', 'department', 'managers']);
+        $departmentId = $audience === 'department'
+            ? Department::query()->inRandomOrder()->value('id')
+            : null;
+
         return [
             'title' => $this->faker->sentence(),
             'body' => $this->faker->paragraphs(2, true),
@@ -28,6 +35,9 @@ class AnnouncementFactory extends Factory
             'ends_at' => $end,
             'is_pinned' => $this->faker->boolean(20),
             'is_active' => $this->faker->boolean(90),
+            'audience' => $audience,
+            'department_id' => $departmentId,
+            'author_id' => User::factory(),
         ];
     }
 }
