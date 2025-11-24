@@ -101,50 +101,137 @@ class DatabaseSeeder extends Seeder
         $slaService = app(SLAService::class);
 
         // Categories & Links
-        $cats = collect([
-            [
-                'name' => 'Hot Topics',
-                'order' => 0,
-                'is_sensitive' => false,
-                'audience' => 'all',
-                'department_id' => null,
-            ],
-            [
-                'name' => 'Health & Safety',
-                'order' => 1,
-                'is_sensitive' => false,
-                'audience' => 'all',
-                'department_id' => null,
-            ],
-            [
-                'name' => 'My Site',
-                'order' => 2,
-                'is_sensitive' => false,
-                'audience' => 'department',
-                'department_id' => $inbound->id ?? null,
-            ],
-            [
-                'name' => 'HR / PxT',
-                'order' => 3,
-                'is_sensitive' => true,
-                'audience' => 'department',
-                'department_id' => $people->id ?? null,
-            ],
-        ])->map(
-            fn ($c) => Category::updateOrCreate(['name' => $c['name']], $c)
-        );
+        $rawPath = $this->resolveLinktreeSnapshotPath();
+        $sections = $this->parseLinktreeSections($rawPath);
 
-        foreach ($cats as $cat) {
-            Link::factory()
-                ->count(5)
-                ->sequence(fn ($sequence) => [
-                    'order' => $sequence->index,
-                    'is_hot' => $cat->order === 0 && $sequence->index < 2,
-                ])
-                ->create([
-                    'category_id' => $cat->id,
-                    'is_active' => true,
-                ]);
+        if (! empty($sections)) {
+            $metaMap = [
+                'Hot Topics' => [
+                    'order' => 0,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                ],
+                'My Site' => [
+                    'order' => 1,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                ],
+                'Diversity, Equity & Inclusion' => [
+                    'order' => 2,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                ],
+                'PxT' => [
+                    'order' => 3,
+                    'is_sensitive' => true,
+                    'audience' => 'department',
+                    'department_id' => $people->id ?? null,
+                ],
+                'Site Tools' => [
+                    'order' => 4,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                ],
+            ];
+
+            $cats = collect();
+            $orderCounter = 0;
+
+            foreach ($sections as $title => $links) {
+                $meta = $metaMap[$title] ?? [];
+
+                $categoryData = [
+                    'name' => $title,
+                    'order' => $meta['order'] ?? $orderCounter,
+                    'is_sensitive' => $meta['is_sensitive'] ?? false,
+                    'audience' => $meta['audience'] ?? 'all',
+                    'department_id' => $meta['department_id'] ?? null,
+                ];
+
+                if ($categoryData['audience'] !== 'department') {
+                    $categoryData['department_id'] = null;
+                } elseif (! $categoryData['department_id']) {
+                    $categoryData['department_id'] = $people?->id ?? $inbound?->id;
+                }
+
+                $category = Category::updateOrCreate(
+                    ['name' => $title],
+                    $categoryData
+                );
+
+                $cats->push($category);
+
+                $labels = [];
+                foreach ($links as $index => $linkData) {
+                    $label = preg_replace('/\s+/', ' ', $linkData['label']);
+                    $labels[] = $label;
+
+                    Link::updateOrCreate(
+                        [
+                            'category_id' => $category->id,
+                            'label' => $label,
+                        ],
+                        [
+                            'url' => $linkData['url'],
+                            'order' => $index,
+                            'is_active' => true,
+                            'is_hot' => $category->name === 'Hot Topics' && $index < 3,
+                        ]
+                    );
+                }
+
+                $category->links()
+                    ->whereNotIn('label', $labels)
+                    ->delete();
+
+                $orderCounter++;
+            }
+        } else {
+            $cats = collect([
+                [
+                    'name' => 'Hot Topics',
+                    'order' => 0,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                    'department_id' => null,
+                ],
+                [
+                    'name' => 'Health & Safety',
+                    'order' => 1,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                    'department_id' => null,
+                ],
+                [
+                    'name' => 'My Site',
+                    'order' => 2,
+                    'is_sensitive' => false,
+                    'audience' => 'department',
+                    'department_id' => $inbound->id ?? null,
+                ],
+                [
+                    'name' => 'HR / PxT',
+                    'order' => 3,
+                    'is_sensitive' => true,
+                    'audience' => 'department',
+                    'department_id' => $people->id ?? null,
+                ],
+            ])->map(
+                fn ($c) => Category::updateOrCreate(['name' => $c['name']], $c)
+            );
+
+            foreach ($cats as $cat) {
+                Link::factory()
+                    ->count(5)
+                    ->sequence(fn ($sequence) => [
+                        'order' => $sequence->index,
+                        'is_hot' => $cat->order === 0 && $sequence->index < 2,
+                    ])
+                    ->create([
+                        'category_id' => $cat->id,
+                        'is_active' => true,
+                    ]);
+            }
         }
 
         // Announcements
@@ -384,5 +471,86 @@ class DatabaseSeeder extends Seeder
             'auditable_id' => RoleChangeRequest::query()->latest('id')->value('id'),
             'payload' => ['target_user_id' => $emp->id],
         ]);
+    }
+
+    /**
+     * Parse the Linktree HTML snapshot into titled link sections.
+     *
+     * @return array<string, array<int, array{label:string, url:string}>>
+     */
+    private function parseLinktreeSections(?string $path): array
+    {
+        if ($path === null || ! is_file($path)) {
+            return [];
+        }
+
+        $html = file_get_contents($path);
+
+        if ($html === false || trim($html) === '') {
+            return [];
+        }
+
+        $previous = libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        $loaded = @$dom->loadHTML($html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        if (! $loaded) {
+            return [];
+        }
+
+        $xpath = new \DOMXPath($dom);
+        $nodes = $xpath->query('//*[@id="links-container"]//*[self::h3 or self::a]');
+
+        if (! $nodes || $nodes->length === 0) {
+            return [];
+        }
+
+        $sections = [];
+        $currentTitle = null;
+
+        /** @var \DOMElement $node */
+        foreach ($nodes as $node) {
+            if ($node->nodeName === 'h3') {
+                $title = trim(preg_replace('/\s+/', ' ', $node->textContent ?? ''));
+                if ($title !== '') {
+                    $currentTitle = $title;
+                    $sections[$currentTitle] ??= [];
+                }
+                continue;
+            }
+
+            if ($node->nodeName === 'a' && $currentTitle !== null) {
+                $label = trim(preg_replace('/\s+/', ' ', $node->textContent ?? ''));
+                $href = trim($node->attributes->getNamedItem('href')?->nodeValue ?? '');
+
+                if ($label !== '' && $href !== '') {
+                    $sections[$currentTitle][] = [
+                        'label' => html_entity_decode($label, ENT_QUOTES | ENT_HTML5),
+                        'url' => html_entity_decode($href, ENT_QUOTES | ENT_HTML5),
+                    ];
+                }
+            }
+        }
+
+        return array_filter($sections, fn ($links) => ! empty($links));
+    }
+
+    private function resolveLinktreeSnapshotPath(): ?string
+    {
+        $candidates = [
+            base_path('data/cwl1informationportal/raw.html'),
+            base_path('../data/cwl1informationportal/raw.html'),
+            base_path('../../data/cwl1informationportal/raw.html'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate)) {
+                return realpath($candidate) ?: $candidate;
+            }
+        }
+
+        return null;
     }
 }

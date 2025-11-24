@@ -19,6 +19,7 @@ Site Bulletin aims to:
 
 ### 2. Targeted Content
 - Announcements and quick links can be targeted by department or leadership audience, keeping communication relevant.
+- Quick Links mirror the latest Linktree snapshot bundled with the project (`data/cwl1informationportal/`) so seeded environments match the real portal.
 - Dashboard badges flag which items are department- or manager-specific.
 
 ### 3. Messaging & Engagement
