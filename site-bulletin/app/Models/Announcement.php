@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 
 class Announcement extends Model
@@ -16,6 +17,7 @@ class Announcement extends Model
     protected $fillable = [
         'title',
         'body',
+        'priority',
         'starts_at',
         'ends_at',
         'is_pinned',
@@ -49,6 +51,13 @@ class Announcement extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function readers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'announcement_reads')
+            ->withPivot(['read_at'])
+            ->withTimestamps();
     }
 
     public function scopeActive(Builder $query): Builder
@@ -91,5 +100,21 @@ class Announcement extends Model
                 $q->orWhere('audience', 'managers');
             }
         });
+    }
+
+    public function markReadFor(User $user): void
+    {
+        $existing = $this->readers()
+            ->where('users.id', $user->id)
+            ->exists();
+
+        if ($existing) {
+            $this->readers()->updateExistingPivot($user->id, ['read_at' => now()]);
+            return;
+        }
+
+        $this->readers()->syncWithoutDetaching([
+            $user->id => ['read_at' => now()],
+        ]);
     }
 }

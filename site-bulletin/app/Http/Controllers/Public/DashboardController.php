@@ -47,6 +47,10 @@ class DashboardController extends Controller
         $unreadConversationCount = 0;
         $governanceLogs = collect();
         $departmentMetricTrend = collect();
+        $managerBenchmark = null;
+        $newsAnnouncements = collect();
+        $unreadAnnouncementCount = 0;
+        $highPriorityAnnouncementCount = 0;
 
         if ($user && $user->isEmployee()) {
             $snapshots = $user->performanceSnapshots()->recent()->orderByDesc('week_start')->get();
@@ -54,6 +58,29 @@ class DashboardController extends Controller
         }
 
         if ($user) {
+            $newsAnnouncements = Announcement::query()
+                ->with(['author:id,name', 'department:id,name'])
+                ->active()
+                ->visibleTo($user)
+                ->ordered()
+                ->withExists([
+                    'readers as is_read' => fn ($query) => $query->where('users.id', $user->id),
+                ])
+                ->take(5)
+                ->get();
+
+            $unreadAnnouncementCount = Announcement::query()
+                ->active()
+                ->visibleTo($user)
+                ->whereDoesntHave('readers', fn ($query) => $query->where('users.id', $user->id))
+                ->count();
+
+            $highPriorityAnnouncementCount = Announcement::query()
+                ->active()
+                ->visibleTo($user)
+                ->whereIn('priority', ['high', 'urgent'])
+                ->count();
+
             $messagePreview = Conversation::query()
                 ->forUser($user)
                 ->with([
@@ -120,10 +147,61 @@ class DashboardController extends Controller
                         ->reverse()
                         ->values();
                 }
+
+                $latestDepartmentMetric = DepartmentMetric::query()
+                    ->where('department_id', $primaryDepartmentId)
+                    ->latest('metric_date')
+                    ->first();
+
+                $latestCompanyMetric = DepartmentMetric::query()
+                    ->whereNull('department_id')
+                    ->latest('metric_date')
+                    ->first();
+
+                if (! $latestCompanyMetric && $latestDepartmentMetric) {
+                    $latestCompanyMetric = DepartmentMetric::query()
+                        ->whereNotNull('department_id')
+                        ->whereDate('metric_date', $latestDepartmentMetric->metric_date->toDateString())
+                        ->selectRaw('AVG(avg_resolution_minutes) as avg_resolution_minutes, AVG(open_tickets) as open_tickets, AVG(sla_breaches) as sla_breaches')
+                        ->first();
+                }
+
+                if ($latestDepartmentMetric && $latestCompanyMetric) {
+                    $departmentResolutionHours = $latestDepartmentMetric->avg_resolution_minutes
+                        ? round($latestDepartmentMetric->avg_resolution_minutes / 60, 1)
+                        : null;
+                    $companyResolutionHours = $latestCompanyMetric->avg_resolution_minutes
+                        ? round($latestCompanyMetric->avg_resolution_minutes / 60, 1)
+                        : null;
+                    $industryResolutionHours = 6.8;
+
+                    $departmentSlaAdherence = $this->calculateSlaAdherence(
+                        (int) $latestDepartmentMetric->open_tickets,
+                        (int) $latestDepartmentMetric->sla_breaches
+                    );
+                    $companySlaAdherence = $this->calculateSlaAdherence(
+                        (int) $latestCompanyMetric->open_tickets,
+                        (int) $latestCompanyMetric->sla_breaches
+                    );
+                    $industrySlaAdherence = 85.0;
+
+                    $managerBenchmark = [
+                        'resolution' => [
+                            'department' => $departmentResolutionHours,
+                            'company' => $companyResolutionHours,
+                            'industry' => $industryResolutionHours,
+                        ],
+                        'sla' => [
+                            'department' => $departmentSlaAdherence,
+                            'company' => $companySlaAdherence,
+                            'industry' => $industrySlaAdherence,
+                        ],
+                    ];
+                }
             }
         }
 
-        return view('dashboard.index', [
+        return view('dashboard', [
             'announcements' => $announcements,
             'categories' => $categories,
             'snapshots' => $snapshots,
@@ -132,6 +210,19 @@ class DashboardController extends Controller
             'unreadConversationCount' => $unreadConversationCount,
             'governanceLogs' => $governanceLogs,
             'departmentMetricTrend' => $departmentMetricTrend,
+            'managerBenchmark' => $managerBenchmark,
+            'newsAnnouncements' => $newsAnnouncements,
+            'unreadAnnouncementCount' => $unreadAnnouncementCount,
+            'highPriorityAnnouncementCount' => $highPriorityAnnouncementCount,
         ]);
+    }
+
+    protected function calculateSlaAdherence(int $openTickets, int $breaches): float
+    {
+        if ($openTickets <= 0) {
+            return 100.0;
+        }
+
+        return round(max(0, min(100, 100 - (($breaches / $openTickets) * 100))), 1);
     }
 }

@@ -29,6 +29,14 @@ class User extends Authenticatable
         'password',
         'role',
         'primary_department_id',
+        'job_title',
+        'employee_id',
+        'phone',
+        'location',
+        'pronouns',
+        'emergency_contact',
+        'email_notifications_enabled',
+        'slack_notifications_enabled',
     ];
 
     /**
@@ -52,6 +60,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'email_notifications_enabled' => 'boolean',
+            'slack_notifications_enabled' => 'boolean',
         ];
     }
 
@@ -97,6 +107,13 @@ class User extends Authenticatable
     public function messages(): HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function readAnnouncements(): BelongsToMany
+    {
+        return $this->belongsToMany(Announcement::class, 'announcement_reads')
+            ->withPivot(['read_at'])
+            ->withTimestamps();
     }
 
     public function managerRelationships(): HasMany

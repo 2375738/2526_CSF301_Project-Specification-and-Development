@@ -18,15 +18,16 @@ Site Bulletin aims to:
 - Filament admin pages allow HR/Admin to maintain user/dept data.
 
 ### 2. Targeted Content
-- Announcements and quick links can be targeted by department or leadership audience, keeping communication relevant.
+- Announcements support audience targeting (`all`, `department`, `managers`) and priority (`low`, `medium`, `high`, `urgent`).
+- Public announcements center supports search, sort, unread/high-priority filtering, mark-read, mark-all-read, and detail drill-down.
 - Quick Links mirror the latest Linktree snapshot bundled with the project (`data/cwl1informationportal/`) so seeded environments match the real portal.
-- Dashboard badges flag which items are department- or manager-specific.
+- Dashboard widgets show latest news updates with unread/high-priority signals.
 
 ### 3. Messaging & Engagement
 - Conversations support three types: `direct`, `department`, `announcement`.
 - Employees may initiate direct chats with peers or managers; only leadership roles can broadcast to departments or issue announcements.
 - Unread tracking, locking, and audit-logging ensure compliance around sensitive threads.
-- Messaging integrates with dashboard widgets for quick awareness.
+- Inbox includes preview cards, unread indicators, type filters, and message search.
 
 ### 4. Ticketing & SLA Management
 - Managers/HR can open tickets on behalf of associates, with department context and automatic SLA evaluation.
@@ -44,14 +45,19 @@ Site Bulletin aims to:
 - Analytics dashboard with filters, saved views, and CSV exports; employees in leadership roles can analyse trends quickly.
 - Scheduled commands recalc metrics and email digests (stored/logged) so leadership receives proactive updates.
 - SLA automation service notifies department managers via announcements when breaches occur, logging the action to audit trail.
+- Dashboard includes role-aware trend panels for employee and manager views.
 
 ## Technology Stack & Architecture
-- **Framework:** Laravel 10, PHP 8+, Composer-managed dependencies.
-- **Front-End:** Blade templates, Tailwind CSS (via Vite). Filament for admin UI components.
+- **Framework:** Laravel 12, PHP 8.2+, Composer-managed dependencies.
+- **Front-End:** Blade templates, Tailwind CSS 3.x via Vite 7, Alpine.js, Axios. Filament 4 for admin UI components.
 - **Database:** MySQL/PostgreSQL friendly; test suite uses SQLite in-memory. Migrations cover all schema changes per phase.
-- **Queue/Automation:** Laravel scheduler, queued jobs (future-ready). Automation service objects encapsulate business logic.
-- **Testing:** PHPUnit feature + unit tests for messaging, analytics, governance, authentication, automation, and SLA calculators.
-- **Documentation:** `/docs/*` holds phase plans, progress log, testing templates, etc.
+- **Queue/Automation:** Laravel scheduler (queue-ready). Automation service objects encapsulate business logic.
+- **Testing:** PHPUnit 11 feature + unit tests for messaging, analytics, governance, authentication, automation, and SLA calculators.
+- **Reference UI:** `Site Bulletin Implementation Guide/` contains the TypeScript guide/prototype used for parity implementation.
+
+## Authentication Modes
+- **Production auth:** standard Laravel email/password login.
+- **Demo auth (local/testing/debug):** login page includes a role + department quick selector (`employee` or `manager`) to mirror guide-style demo entry.
 
 ## Algorithms & Business Logic Highlights
 - **SLA Evaluation (`App\Services\SLAService`)**: Calculates first response and resolution active minutes, respects pause states. Used across ticket lifecycle, analytics, and automation.
@@ -63,10 +69,12 @@ Site Bulletin aims to:
 ## Role Matrix & Permissions
 | Feature/Area              | Employee | Manager/Ops Manager | HR | Admin |
 |---------------------------|:--------:|:-------------------:|:--:|:-----:|
-| Dashboard (basic cards)   | ✅       | ✅                  | ✅ | ✅    |
+| Dashboard (cards + trend panels)   | ✅       | ✅                  | ✅ | ✅    |
 | Direct messaging          | ✅ (direct only) | ✅ | ✅ | ✅ |
 | Department/Announcement messaging | ❌ | ✅ | ✅ | ✅ |
 | Tickets (self)            | ✅       | ✅ (on behalf)      | ✅ | ✅    |
+| Announcements center (search/filter/read) | ✅ | ✅ | ✅ | ✅ |
+| Public announcement composer | ❌ | ✅ (department scope) | ✅ | ✅ |
 | Ticket SLA automation logs | View via dashboard widget | ✅ | ✅ | ✅ |
 | Governance hub            | Read-only policies | Full access to audit list; role requests creation | Full access + approvals | Full access |
 | Role change approvals     | ❌       | ❌                  | ✅ (approve) | ✅ |
@@ -81,12 +89,13 @@ Site Bulletin aims to:
 5. **Automation pipeline**: Overnight jobs recalc SLA/ticket metrics, generate digest, log output. Next morning managers view aggregated data on dashboard.
 
 ## Technology Setup & Running Locally
-1. **Clone & install**  
+1. **Clone and enter app directory**  
    ```bash
    git clone <repo-url>
+   cd "<repo>/site-bulletin"
    composer install
    npm install
-   npm run build # or npm run dev
+   npm run build   # or npm run dev
    ```
 2. **Configure environment**  
    Copy `.env.example` → `.env`; set DB credentials, `APP_KEY`, queue/mail if required.
@@ -107,6 +116,11 @@ Site Bulletin aims to:
 6. **Scheduled Tasks**  
    Register cron `* * * * * php /path/to/artisan schedule:run` to execute daily SLA recalcs and analytics digests.
 
+## Repository Structure
+- `site-bulletin/`: Main Laravel application (source of truth).
+- `Site Bulletin Implementation Guide/`: TypeScript guide/prototype used for feature parity reference.
+- `data/cwl1informationportal/`: Seed/reference quick-link source data used by the Laravel seeder.
+
 ## Seeded Accounts
 | Role | Email | Password |
 |------|-------|----------|
@@ -117,14 +131,11 @@ Site Bulletin aims to:
 
 Login as different roles to experience UI/permissions (e.g., employee sees direct messaging and ticket submission; manager sees analytics, governance, and departmental messaging).
 
-## Documentation Trail
-- `docs/progress-log.md` – Detailed history of each phase, completed dates, follow-ups.
-- `docs/phase-6-analytics-automation-plan.md` – Planning notes plus completion addendum.
-- Other docs in `/docs` capture phase plans, testing templates, risk register, etc.
+In local/testing environments you can also use **Quick Demo Access** on the login page to enter directly by role and optional department.
 
 ## Future Enhancements (Backlog)
 - Messaging file attachments & push/email notifications.
-- Visualization charts for analytics dashboard, automated email digests to actual recipients, deeper automation triggers on repeated SLA breaches.
+- Automated email digests to actual recipients, deeper automation triggers on repeated SLA breaches.
 - Integration with external systems (e.g., Amazon’s Ops ticketing or S3 for export storage) for production-scale deployments.
 
 ---

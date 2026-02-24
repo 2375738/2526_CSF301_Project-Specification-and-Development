@@ -47,6 +47,15 @@ class AnnouncementForm
                     ->columnSpanFull()
                     ->rows(5)
                     ->required(),
+                Select::make('priority')
+                    ->options([
+                        'low' => 'Low',
+                        'medium' => 'Medium',
+                        'high' => 'High',
+                        'urgent' => 'Urgent',
+                    ])
+                    ->default('medium')
+                    ->required(),
                 Select::make('audience')
                     ->options($audienceOptions)
                     ->default(array_key_first($audienceOptions))

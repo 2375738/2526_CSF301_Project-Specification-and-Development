@@ -10,6 +10,7 @@
     ];
     $requestedType = request('type');
     $activeType = $activeType ?? (array_key_exists($requestedType, $filterOptions) ? $requestedType : null);
+    $search = $search ?? request('q', '');
   @endphp
 
   <div class="space-y-6">
@@ -22,11 +23,69 @@
       <a href="{{ route('home') }}" class="text-sm font-medium text-blue-600 hover:underline">Back to Dashboard</a>
     </div>
 
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">Recent Chats</h2>
+          <p class="text-xs text-slate-500">{{ $unreadConversationCount ?? 0 }} unread conversation{{ ($unreadConversationCount ?? 0) === 1 ? '' : 's' }}.</p>
+        </div>
+      </div>
+      @if (($previewConversations ?? collect())->isEmpty())
+        <p class="text-sm text-slate-500">No recent chats yet.</p>
+      @else
+        <div class="grid gap-3 md:grid-cols-3">
+          @foreach ($previewConversations as $conversation)
+            @php
+              $latest = $conversation->messages->first();
+              $isUnread = ($conversation->unread_count ?? 0) > 0;
+            @endphp
+            <article class="rounded-lg border px-4 py-3 {{ $isUnread ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white' }}">
+              <div class="flex items-start justify-between gap-2">
+                <a href="{{ route('messages.show', $conversation) }}" class="font-semibold text-slate-900 hover:underline line-clamp-1">
+                  {{ $conversation->subject ?? __('(No subject)') }}
+                </a>
+                @if ($isUnread)
+                  <span class="inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
+                    {{ $conversation->unread_count }} new
+                  </span>
+                @endif
+              </div>
+              @if ($latest)
+                <p class="mt-2 text-xs text-slate-600 line-clamp-2">
+                  <span class="font-semibold">{{ $latest->sender->name }}:</span>
+                  {{ \Illuminate\Support\Str::limit($latest->body, 90) }}
+                </p>
+              @endif
+              <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span>{{ ucfirst($conversation->type) }}</span>
+                <span>{{ $conversation->updated_at->diffForHumans() }}</span>
+              </div>
+            </article>
+          @endforeach
+        </div>
+      @endif
+    </section>
+
     @if (session('status'))
       <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
         {{ session('status') }}
       </div>
     @endif
+
+    <form method="GET" action="{{ route('messages.index') }}" class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex flex-wrap items-center gap-2">
+      <input type="search" name="q" value="{{ $search }}" placeholder="Search subjects, participants, or messages..." aria-label="Search messages" class="w-full md:flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+      @if ($activeType)
+        <input type="hidden" name="type" value="{{ $activeType }}">
+      @endif
+      <button type="submit" class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+        Search
+      </button>
+      @if ($search !== '')
+        <a href="{{ route('messages.index', array_filter(['type' => $activeType])) }}" class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+          Clear
+        </a>
+      @endif
+    </form>
 
     <nav class="flex flex-wrap items-center gap-2 text-sm">
       @foreach ($filterOptions as $value => $label)
@@ -85,7 +144,11 @@
           </article>
         @empty
           <div class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-slate-500">
-            No conversations yet.
+            @if ($search !== '')
+              No conversations matched your search.
+            @else
+              No conversations yet.
+            @endif
           </div>
         @endforelse
 

@@ -32,70 +32,151 @@ class DatabaseSeeder extends Seeder
 
         $departments = Department::all()->keyBy('slug');
 
-        // Users
+        // Ensure we have these departments
+        $deptNames = ['inbound-operations', 'outbound-operations', 'people-experience', 'safety', 'facilities', 'it-support'];
+        foreach ($deptNames as $slug) {
+            if (!$departments->has($slug)) {
+                $name = ucwords(str_replace('-', ' ', $slug));
+                $dept = Department::create(['name' => $name, 'slug' => $slug]);
+                $departments->put($slug, $dept);
+            }
+        }
+
+        // --- Key Users (for Demo/Testing) ---
         $admin = User::updateOrCreate(
             ['email' => 'admin@example.com'],
             [
-                'name' => 'Admin',
+                'name' => 'Admin User',
                 'password' => Hash::make('password'),
                 'role' => 'admin',
+                'job_title' => 'Site Leader',
+                'employee_id' => '10000001',
+                'location' => 'Site Admin Office',
+                'phone' => '+1 (555) 000-0001',
             ]
         );
-        $mgr = User::updateOrCreate(
-            ['email' => 'manager@example.com'],
-            [
-                'name' => 'Manager',
-                'password' => Hash::make('password'),
-                'role' => 'manager',
-            ]
-        );
-        $emp = User::updateOrCreate(
-            ['email' => 'employee@example.com'],
-            [
-                'name' => 'Employee',
-                'password' => Hash::make('password'),
-                'role' => 'employee',
-            ]
-        );
+
         $hr = User::updateOrCreate(
             ['email' => 'hr@example.com'],
             [
                 'name' => 'HR Manager',
                 'password' => Hash::make('password'),
                 'role' => 'hr',
+                'job_title' => 'Sr. HR Business Partner',
+                'employee_id' => '10000002',
+                'location' => 'HR Hub',
+                'phone' => '+1 (555) 000-0002',
             ]
         );
+
+        $mgr = User::updateOrCreate(
+            ['email' => 'manager@example.com'],
+            [
+                'name' => 'Operations Manager',
+                'password' => Hash::make('password'),
+                'role' => 'manager',
+                'job_title' => 'Area Manager',
+                'employee_id' => '10000003',
+                'location' => 'Inbound Dock Office',
+                'phone' => '+1 (555) 000-0003',
+            ]
+        );
+
+        $emp = User::updateOrCreate(
+            ['email' => 'employee@example.com'],
+            [
+                'name' => 'John Doe',
+                'password' => Hash::make('password'),
+                'role' => 'employee',
+                'job_title' => 'Process Assistant',
+                'employee_id' => '10000004',
+                'location' => 'Inbound Dock',
+                'phone' => '+1 (555) 000-0004',
+            ]
+        );
+
+        // --- Assign Departments & Relationships for Key Users ---
+        $inbound = $departments->get('inbound-operations');
+        $people = $departments->get('people-experience');
 
         $assignDepartment = function (User $user, Department $department, string $role, bool $primary = false): void {
             if ($primary) {
                 $user->primary_department_id = $department->id;
                 $user->save();
             }
-
             $user->departments()->syncWithoutDetaching([
-                $department->id => [
-                    'role' => $role,
-                    'is_primary' => $primary,
-                ],
+                $department->id => ['role' => $role, 'is_primary' => $primary],
             ]);
         };
 
-        $inbound = null;
-        $people = null;
+        $assignDepartment($admin, $inbound, 'manager', true); // Admin technically oversees everything, but primary here
+        $assignDepartment($hr, $people, 'hr_manager', true);
+        $assignDepartment($mgr, $inbound, 'manager', true);
+        $assignDepartment($emp, $inbound, 'member', true);
 
-        if ($departments->isNotEmpty()) {
-            $inbound = $departments->get('inbound-operations') ?? $departments->first();
-            $people = $departments->get('people-experience') ?? $departments->first();
+        // Reporting Lines for Key Users
+        ManagerRelationship::updateOrCreate(['manager_id' => $mgr->id, 'reports_to_id' => $admin->id], ['relationship_type' => 'direct']);
+        ManagerRelationship::updateOrCreate(['manager_id' => $emp->id, 'reports_to_id' => $mgr->id], ['relationship_type' => 'direct']);
+        ManagerRelationship::updateOrCreate(['manager_id' => $hr->id, 'reports_to_id' => $admin->id], ['relationship_type' => 'direct']);
 
-            $assignDepartment($admin, $people, 'hr_manager', true);
-            $assignDepartment($hr, $people, 'hr_manager', true);
-            $assignDepartment($mgr, $inbound, 'manager', true);
-            $assignDepartment($emp, $inbound, 'member', true);
 
-            ManagerRelationship::updateOrCreate(
-                ['manager_id' => $mgr->id, 'reports_to_id' => $admin->id],
-                ['relationship_type' => 'direct']
-            );
+        // --- Generate Generic Organizational Structure ---
+        $faker = \Faker\Factory::create();
+
+        foreach ($departments as $slug => $dept) {
+            // Skip Inbound/People for generic generation if we want to keep them clean, 
+            // but let's add more people to them too to make it busy.
+            
+            // 1. Create a Department Manager (if not already covered by key users)
+            if ($slug === 'inbound-operations') {
+                $deptManager = $mgr;
+            } elseif ($slug === 'people-experience') {
+                $deptManager = $hr;
+            } else {
+                $deptManager = User::create([
+                    'name' => $faker->name,
+                    'email' => $slug . '.manager@example.com',
+                    'password' => Hash::make('password'),
+                    'role' => 'manager',
+                    'job_title' => 'Area Manager',
+                    'employee_id' => $faker->unique()->numerify('10######'),
+                    'location' => $dept->name . ' Office',
+                    'phone' => $faker->phoneNumber,
+                    'primary_department_id' => $dept->id,
+                ]);
+                $assignDepartment($deptManager, $dept, 'manager', true);
+                
+                // Report to Admin (Site Lead)
+                ManagerRelationship::create([
+                    'manager_id' => $deptManager->id,
+                    'reports_to_id' => $admin->id,
+                    'relationship_type' => 'direct',
+                ]);
+            }
+
+            // 2. Create Employees for this Department
+            $employeeCount = rand(5, 12);
+            for ($i = 0; $i < $employeeCount; $i++) {
+                $employee = User::create([
+                    'name' => $faker->name,
+                    'email' => str_replace('-', '.', $slug) . '.emp' . $i . '@example.com',
+                    'password' => Hash::make('password'),
+                    'role' => 'employee',
+                    'job_title' => $faker->randomElement(['Associate I', 'Associate II', 'Process Assistant', 'Specialist']),
+                    'employee_id' => $faker->unique()->numerify('10######'),
+                    'location' => $dept->name . ' Floor',
+                    'phone' => $faker->phoneNumber,
+                    'primary_department_id' => $dept->id,
+                ]);
+                $assignDepartment($employee, $dept, 'member', true);
+
+                // Report to Department Manager
+                ManagerRelationship::create([
+                    'manager_id' => $employee->id,
+                    'reports_to_id' => $deptManager->id,
+                    'relationship_type' => 'direct',
+                ]);
+            }
         }
 
         $slaService = app(SLAService::class);

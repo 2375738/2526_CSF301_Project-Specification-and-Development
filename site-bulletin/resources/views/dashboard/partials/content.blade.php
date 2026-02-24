@@ -27,7 +27,7 @@
               <path d="M9.25 3a.75.75 0 00-1.5 0v2.5H5.25a.75.75 0 000 1.5H7.75V9.5a.75.75 0 001.5 0V7h2.5a.75.75 0 000-1.5H9.25z" />
               <path d="M16.5 5A1.5 1.5 0 0118 6.5v9A1.5 1.5 0 0116.5 17h-13A1.5 1.5 0 012 15.5v-9A1.5 1.5 0 013.5 5h13z" />
             </svg>
-            View My Tickets
+            View My Tasks
           </a>
           @if (auth()->user()->isEmployee())
             <a href="{{ route('tickets.create') }}" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-100">
@@ -73,6 +73,11 @@
     @endauth
   </section>
 
+  @include('dashboard.partials.trend-panels', [
+      'snapshots' => $snapshots,
+      'departmentMetricTrend' => $departmentMetricTrend,
+  ])
+
   @include('dashboard.partials.messages-widget', [
       'messagePreview' => $messagePreview,
       'unreadConversationCount' => $unreadConversationCount,
@@ -86,10 +91,16 @@
       'departmentMetricTrend' => $departmentMetricTrend,
   ])
 
+  @include('dashboard.partials.news-widget', [
+      'newsAnnouncements' => $newsAnnouncements ?? collect(),
+      'unreadAnnouncementCount' => $unreadAnnouncementCount ?? 0,
+      'highPriorityAnnouncementCount' => $highPriorityAnnouncementCount ?? 0,
+  ])
+
   <section class="space-y-5">
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-semibold text-slate-900">Announcements</h2>
-      <span class="text-xs uppercase tracking-wider text-slate-500">Latest first</span>
+      <a href="{{ route('announcements.index') }}" class="text-xs font-semibold uppercase tracking-wider text-blue-600 hover:underline">View all</a>
     </div>
     @if ($announcements->isEmpty())
       <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">

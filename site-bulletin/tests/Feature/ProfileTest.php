@@ -61,6 +61,31 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
+    public function test_notification_preferences_can_be_updated(): void
+    {
+        $user = User::factory()->create([
+            'email_notifications_enabled' => true,
+            'slack_notifications_enabled' => false,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_notifications_enabled' => 0,
+                'slack_notifications_enabled' => 1,
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+        $this->assertFalse($user->email_notifications_enabled);
+        $this->assertTrue($user->slack_notifications_enabled);
+    }
+
     public function test_user_can_delete_their_account(): void
     {
         $user = User::factory()->create();

@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\AnalyticsController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Public\AnnouncementController;
 use App\Http\Controllers\Public\DashboardController;
 use App\Http\Controllers\Public\GovernanceController;
 use App\Http\Controllers\Public\ReportTicketController;
@@ -72,11 +74,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/escalation', [GovernanceController::class, 'escalation'])->name('escalation');
     });
 
+    Route::prefix('announcements')->name('announcements.')->group(function () {
+        Route::get('/', [AnnouncementController::class, 'index'])->name('index');
+        Route::post('/', [AnnouncementController::class, 'store'])->name('store');
+        Route::get('/{announcement}', [AnnouncementController::class, 'show'])->name('show');
+        Route::patch('/{announcement}/read', [AnnouncementController::class, 'markRead'])->name('read');
+        Route::post('/read-all', [AnnouncementController::class, 'markAllRead'])->name('read-all');
+    });
+
     Route::middleware('role:employee,manager,ops_manager,hr,admin')->group(function () {
         Route::get('/role-requests', [RoleChangeRequestController::class, 'index'])->name('role-requests.index');
         Route::get('/role-requests/new', [RoleChangeRequestController::class, 'create'])->name('role-requests.create');
         Route::post('/role-requests', [RoleChangeRequestController::class, 'store'])->name('role-requests.store');
     });
+
+    // Notifications
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 });
 
 require __DIR__ . '/auth.php';

@@ -29,6 +29,15 @@ class AnnouncementsTable
                     ->badge()
                     ->label('Audience')
                     ->formatStateUsing(fn ($state) => ucfirst($state)),
+                TextColumn::make('priority')
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => ucfirst($state))
+                    ->colors([
+                        'gray' => 'low',
+                        'info' => 'medium',
+                        'warning' => 'high',
+                        'danger' => 'urgent',
+                    ]),
                 TextColumn::make('starts_at')
                     ->dateTime()
                     ->sortable(),

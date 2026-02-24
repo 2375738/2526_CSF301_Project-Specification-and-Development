@@ -20,22 +20,53 @@ class ConversationController extends Controller
         $user = $request->user();
 
         $filterType = $request->query('type');
+        $search = trim((string) $request->query('q', ''));
 
         if ($filterType && ! in_array($filterType, ['direct', 'department', 'announcement'], true)) {
             $filterType = null;
         }
 
-        $conversations = Conversation::query()
+        $baseQuery = Conversation::query()
             ->forUser($user)
             ->with([
                 'participants:id,name,role',
                 'messages' => fn ($query) => $query->latest()->with('sender:id,name,role')->limit(1),
                 'department:id,name',
             ])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('subject', 'like', '%' . $search . '%')
+                        ->orWhereHas('participants', fn ($participants) => $participants->where('users.name', 'like', '%' . $search . '%'))
+                        ->orWhereHas('messages', fn ($messages) => $messages->where('body', 'like', '%' . $search . '%'));
+                });
+            });
+
+        $conversations = (clone $baseQuery)
             ->when($filterType, fn ($query) => $query->where('type', $filterType))
             ->orderByDesc('updated_at')
             ->paginate(10)
             ->withQueryString();
+
+        $previewConversations = (clone $baseQuery)
+            ->when($filterType, fn ($query) => $query->where('type', $filterType))
+            ->orderByDesc('updated_at')
+            ->take(3)
+            ->get()
+            ->map(function (Conversation $conversation) use ($user) {
+                $conversation->unread_count = $conversation->unreadCountFor($user);
+                return $conversation;
+            });
+
+        $unreadConversationCount = Conversation::query()
+            ->forUser($user)
+            ->whereHas('participants', function ($query) use ($user) {
+                $query->where('users.id', $user->id)
+                    ->where(function ($sub) {
+                        $sub->whereNull('conversation_participants.last_read_at')
+                            ->orWhereColumn('conversation_participants.last_read_at', '<', 'conversations.updated_at');
+                    });
+            })
+            ->count();
 
         $managedDepartmentOptions = collect();
 
@@ -52,9 +83,12 @@ class ConversationController extends Controller
 
         return view('messages.index', [
             'conversations' => $conversations,
+            'previewConversations' => $previewConversations,
+            'unreadConversationCount' => $unreadConversationCount,
             'managedDepartmentOptions' => $managedDepartmentOptions,
             'recipientOptions' => $recipientOptions,
             'activeType' => $filterType,
+            'search' => $search,
         ]);
     }
 

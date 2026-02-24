@@ -42,5 +42,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-sla', fn (User $user) => $user->isAdmin());
         Gate::define('view-analytics', fn (User $user) => $user->hasRole('manager', 'ops_manager', 'hr', 'admin'));
         Gate::define('manage-users', fn (User $user) => $user->isAdmin());
+
+        \App\Models\Message::observe(\App\Observers\MessageObserver::class);
+        \App\Models\Announcement::observe(\App\Observers\AnnouncementObserver::class);
     }
 }

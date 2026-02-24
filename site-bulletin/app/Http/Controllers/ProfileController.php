@@ -16,8 +16,44 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $jobHistory = [
+            [
+                'role' => 'FC Associate I, L1',
+                'department' => 'Fulfillment Center - VAR',
+                'manager' => 'Tim Houlston Clark',
+                'manager_email' => 'timthoul@example.com',
+                'start_date' => '11 Oct 2023',
+                'duration' => '1 month and 14 days',
+                'status' => 'current',
+            ],
+            [
+                'role' => 'FC Associate I, L1',
+                'department' => 'Fulfillment Center - VAR',
+                'manager' => 'Marian Luca',
+                'manager_email' => 'lucamari@example.com',
+                'start_date' => '26 May 2025',
+                'duration' => '4 months and 15 days',
+                'status' => 'past',
+            ],
+            [
+                'role' => 'FC Associate I, L1',
+                'department' => 'Fulfillment Center - VAR',
+                'manager' => 'Jonathan Davies',
+                'manager_email' => 'jonathad@example.com',
+                'start_date' => '28 Apr 2025',
+                'duration' => '28 days',
+                'status' => 'past',
+            ],
+        ];
+
+        // In ManagerRelationship: manager_id is the SUBORDINATE, reports_to_id is the BOSS.
+        // So we want the relationship where 'manager_id' is the current user.
+        $manager = $request->user()->managerRelationships()->with('reportsTo')->first()?->reportsTo;
+
         return view('profile.edit', [
             'user' => $request->user(),
+            'manager' => $manager,
+            'jobHistory' => $jobHistory,
         ]);
     }
 
