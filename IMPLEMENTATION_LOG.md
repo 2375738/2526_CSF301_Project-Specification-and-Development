@@ -672,6 +672,24 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - `php artisan test --filter=ConversationLockTest`
 - Result: Passed.
 
+## Block: Testing
+- Date: 2026-03-10
+- Scope: Browser coverage expansion for hardened role and visibility flows.
+- Changes:
+  - Extended Playwright smoke coverage to include:
+    - acknowledgement state switching from `Need Clarification` to `Understood`
+    - manager visibility of manager-only knowledge snippets
+    - employee exclusion from manager-only knowledge snippets
+    - manager denial of triage board entry and direct route access
+- Rationale:
+  - Move browser coverage beyond happy-path navigation and lock in the role/scope behaviors hardened in the backend test passes.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `npx playwright test`
+- Result: Passed (`12/12`).
+
 ## Block: Parity
 - Date: 2026-02-25
 - Scope: True multi-department seed distribution and manager/SLA data realism.

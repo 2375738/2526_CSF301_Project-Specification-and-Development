@@ -84,6 +84,24 @@ test('employee can acknowledge an announcement as understood', async ({ page }) 
   await expect(page.getByText('Understood', { exact: true }).first()).toBeVisible();
 });
 
+test('employee can switch announcement acknowledgement from clarification to understood', async ({ page }) => {
+  await loginWithPreset(page, 'Employee');
+
+  await page.goto('/announcements');
+  await page.getByRole('searchbox', { name: 'Search announcements' }).fill('Parking Rota');
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await page.getByRole('link', { name: 'Parking Rota Updated for This Week' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Acknowledge This Update' })).toBeVisible();
+  await page.getByRole('button', { name: 'Need Clarification' }).click();
+  await expect(page.getByText('Clarification requested')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Understood' }).click();
+  await expect(page.getByText('Clarification requested')).not.toBeVisible();
+  await expect(page.getByText('Current acknowledgement:')).toBeVisible();
+  await expect(page.getByText('Understood', { exact: true }).first()).toBeVisible();
+});
+
 test('manager dashboard shows the attention queue', async ({ page }) => {
   await loginWithPreset(page, 'Manager');
 
@@ -92,4 +110,34 @@ test('manager dashboard shows the attention queue', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Breached Tickets' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Unread Conversations' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Pending Role Requests' })).toBeVisible();
+});
+
+test('manager can find manager-only knowledge guidance', async ({ page }) => {
+  await loginWithPreset(page, 'Manager');
+
+  await page.goto('/knowledge');
+  await page.getByRole('searchbox', { name: 'Search knowledge snippets' }).fill('escalation');
+  await page.getByRole('button', { name: 'Search' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Manager-only escalation pack' })).toBeVisible();
+});
+
+test('employee does not see manager-only knowledge guidance in search results', async ({ page }) => {
+  await loginWithPreset(page, 'Employee');
+
+  await page.goto('/knowledge');
+  await page.getByRole('searchbox', { name: 'Search knowledge snippets' }).fill('escalation');
+  await page.getByRole('button', { name: 'Search' }).click();
+
+  await expect(page.getByText('Manager-only escalation pack')).not.toBeVisible();
+});
+
+test('manager does not see or access the triage board', async ({ page }) => {
+  await loginWithPreset(page, 'Manager');
+
+  await page.goto('/tickets');
+  await expect(page.getByRole('link', { name: 'Open triage board' })).not.toBeVisible();
+
+  const response = await page.goto('/tickets/triage');
+  expect(response?.status()).toBe(403);
 });
