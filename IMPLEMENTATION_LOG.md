@@ -612,6 +612,66 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - `php artisan test --filter=TicketFiltersTest`
 - Result: Passed.
 
+## Block: Hardening
+- Date: 2026-03-10
+- Scope: Permissions and edge-case audit for newly added roadmap surfaces.
+- Changes:
+  - Fixed support triage scoping so `ops_manager` users without any managed departments do not fall through to a global ticket queue.
+  - Expanded knowledge snippet visibility so `admin` users can access `managers` audience content, matching the intended privileged audience model.
+  - Added regression coverage for both cases:
+    - triage empty scoped queue for unmanaged `ops_manager`
+    - manager-only knowledge visibility for `admin`
+- Rationale:
+  - Prevent overexposure of ticket data through an empty scope edge case.
+  - Align privileged content visibility with the rest of the role model instead of excluding admins from manager-level operational guidance.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `php artisan test --filter=TriageBoardTest`
+  - `php artisan test --filter=KnowledgeSnippetSearchTest`
+- Result: Passed.
+
+## Block: Hardening
+- Date: 2026-03-10
+- Scope: Second permissions and scope audit for announcements and manager dashboard surfaces.
+- Changes:
+  - Expanded manager-only announcement visibility to include `admin`, keeping announcement audience rules aligned with the privileged role model.
+  - Added acknowledgement update regression coverage to prove repeated acknowledgement changes update a single read receipt instead of creating duplicates.
+  - Fixed manager dashboard scope selection so operational panels and the attention queue fall back to a managed department when `primary_department_id` does not match actual managed assignments.
+- Rationale:
+  - Remove inconsistent privileged-access behavior between announcements and other manager-only content.
+  - Protect acknowledgement analytics from duplicate receipt edge cases.
+  - Prevent manager dashboards from showing empty or misleading department context due to stale or mismatched profile data.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `php artisan test --filter=AnnouncementReadFlowTest`
+  - `php artisan test --filter=DashboardTrendPanelsTest`
+- Result: Passed.
+
+## Block: Hardening
+- Date: 2026-03-10
+- Scope: Routed messaging fallback and direct-thread reuse audit.
+- Changes:
+  - Changed routed shortcut submission to return a validation error when the target contact is unavailable instead of failing with a hard `403`.
+  - Added a self-recipient guard to routed shortcut resolution so malformed org data cannot route a conversation back to the sender.
+  - Fixed direct-thread reuse to ignore locked threads and reuse the newest unlocked matching direct conversation when one exists.
+  - Added regression coverage for:
+    - forged shortcut submission without a valid recipient
+    - locked-latest thread with older reusable unlocked direct conversation
+- Rationale:
+  - Make messaging failures recoverable in the UI instead of presenting authorization errors for missing routing data.
+  - Prevent unnecessary duplicate direct conversations when the latest matching thread is locked but a valid reusable thread still exists.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `php artisan test --filter=ConversationCreationTest`
+  - `php artisan test --filter=ConversationLockTest`
+- Result: Passed.
+
 ## Block: Parity
 - Date: 2026-02-25
 - Scope: True multi-department seed distribution and manager/SLA data realism.

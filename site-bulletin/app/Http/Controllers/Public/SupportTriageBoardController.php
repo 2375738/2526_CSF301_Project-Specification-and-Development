@@ -22,8 +22,12 @@ class SupportTriageBoardController extends Controller
         $baseQuery = Ticket::query()
             ->with(['requester:id,name', 'assignee:id,name', 'category:id,name', 'department:id,name']);
 
-        if ($scopeDepartmentIds !== null && $scopeDepartmentIds->isNotEmpty()) {
-            $baseQuery->whereIn('department_id', $scopeDepartmentIds);
+        if ($scopeDepartmentIds !== null) {
+            if ($scopeDepartmentIds->isEmpty()) {
+                $baseQuery->whereRaw('1 = 0');
+            } else {
+                $baseQuery->whereIn('department_id', $scopeDepartmentIds);
+            }
         }
 
         $unassignedNew = (clone $baseQuery)

@@ -233,4 +233,45 @@ class DashboardTrendPanelsTest extends TestCase
             ->assertSeeText('Dept 72.0')
             ->assertDontSeeText('Dept 905.0');
     }
+
+    public function test_manager_dashboard_falls_back_to_managed_department_when_primary_department_is_not_managed(): void
+    {
+        $managedDepartment = Department::factory()->create(['name' => 'Support']);
+        $otherDepartment = Department::factory()->create(['name' => 'Outbound']);
+        $manager = User::factory()->manager()->create([
+            'primary_department_id' => $otherDepartment->id,
+        ]);
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $managedDepartment->id,
+        ]);
+        $category = Category::factory()->create([
+            'name' => 'Operations',
+            'audience' => 'all',
+        ]);
+
+        $manager->departments()->attach($managedDepartment->id, ['role' => 'manager', 'is_primary' => true]);
+        $employee->departments()->attach($managedDepartment->id, ['role' => 'member', 'is_primary' => true]);
+
+        DepartmentMetric::factory()->create([
+            'department_id' => $managedDepartment->id,
+            'metric_date' => now()->toDateString(),
+        ]);
+
+        Ticket::factory()->create([
+            'requester_id' => $employee->id,
+            'department_id' => $managedDepartment->id,
+            'category_id' => $category->id,
+            'status' => 'in_progress',
+            'title' => 'Managed department queue item',
+            'sla_resolution_breached' => true,
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSeeText('Attention Queue')
+            ->assertSeeText('Managed department queue item')
+            ->assertSeeText('Department Trend Overview');
+    }
 }

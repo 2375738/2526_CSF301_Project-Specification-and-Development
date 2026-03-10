@@ -56,4 +56,20 @@ class KnowledgeSnippetSearchTest extends TestCase
             ->assertOk()
             ->assertSeeText('Manager escalation guide');
     }
+
+    public function test_admin_can_see_manager_only_knowledge_snippet(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        KnowledgeSnippet::factory()->create([
+            'title' => 'Leadership escalation guide',
+            'body' => 'Use the senior incident path for site-wide blockers.',
+            'audience' => 'managers',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('knowledge.index'))
+            ->assertOk()
+            ->assertSeeText('Leadership escalation guide');
+    }
 }

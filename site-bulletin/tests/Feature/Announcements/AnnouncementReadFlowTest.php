@@ -55,6 +55,36 @@ class AnnouncementReadFlowTest extends TestCase
         ]);
     }
 
+    public function test_user_can_update_acknowledgement_without_creating_duplicate_receipts(): void
+    {
+        $user = User::factory()->create();
+        $announcement = Announcement::factory()->create([
+            'audience' => 'all',
+            'is_active' => true,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addDay(),
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('announcements.acknowledge', $announcement), [
+                'acknowledgement' => 'needs_clarification',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->patch(route('announcements.acknowledge', $announcement), [
+                'acknowledgement' => 'understood',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(1, $announcement->readers()->where('users.id', $user->id)->count());
+        $this->assertDatabaseHas('announcement_reads', [
+            'announcement_id' => $announcement->id,
+            'user_id' => $user->id,
+            'acknowledgement' => 'understood',
+        ]);
+    }
+
     public function test_manager_sees_acknowledgement_summary_on_announcement_detail(): void
     {
         $manager = User::factory()->manager()->create();
@@ -106,5 +136,21 @@ class AnnouncementReadFlowTest extends TestCase
         $this->actingAs($user)
             ->get(route('announcements.show', $announcement))
             ->assertNotFound();
+    }
+
+    public function test_admin_can_open_manager_only_announcement(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $announcement = Announcement::factory()->create([
+            'audience' => 'managers',
+            'is_active' => true,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addDay(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('announcements.show', $announcement))
+            ->assertOk()
+            ->assertSeeText($announcement->title);
     }
 }

@@ -155,7 +155,12 @@ class ConversationController extends Controller
 
         if ($shortcut) {
             $recipient = $this->resolveShortcutRecipient($user, $shortcut);
-            abort_unless($recipient !== null, 403);
+
+            if (! $recipient) {
+                return Redirect::back()
+                    ->withErrors(['shortcut' => 'The selected routed contact is not available right now.'])
+                    ->withInput();
+            }
 
             $type = 'direct';
             $participantIds = collect([$recipient->id]);
@@ -267,12 +272,18 @@ class ConversationController extends Controller
 
     protected function resolveShortcutRecipient(User $user, string $shortcut): ?User
     {
-        return match ($shortcut) {
+        $recipient = match ($shortcut) {
             'my_manager' => $this->resolveManagerShortcutRecipient($user),
             'support_team' => $this->resolveSupportShortcutRecipient($user),
             'hr_team' => $this->resolveHrShortcutRecipient($user),
             default => null,
         };
+
+        if (! $recipient || $recipient->id === $user->id) {
+            return null;
+        }
+
+        return $recipient;
     }
 
     protected function resolveManagerShortcutRecipient(User $user): ?User
@@ -334,15 +345,12 @@ class ConversationController extends Controller
 
         $conversation = Conversation::query()
             ->where('type', 'direct')
+            ->where('is_locked', false)
             ->whereHas('participants', fn ($query) => $query->where('users.id', $ids[0]))
             ->whereHas('participants', fn ($query) => $query->where('users.id', $ids[1]))
             ->whereDoesntHave('participants', fn ($query) => $query->whereNotIn('users.id', $ids))
             ->orderByDesc('updated_at')
             ->first();
-
-        if ($conversation?->is_locked) {
-            return null;
-        }
 
         return $conversation;
     }

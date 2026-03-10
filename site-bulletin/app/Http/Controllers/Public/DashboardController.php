@@ -156,12 +156,12 @@ class DashboardController extends Controller
                     $departmentAnalytics->recalculateForDate(Carbon::now());
                 }
 
-                $primaryDepartmentId = $user->primary_department_id;
-                $primaryDepartment = $primaryDepartmentId ? Department::query()->find($primaryDepartmentId) : null;
-                $departmentAnalytics->ensureRecentWindow($primaryDepartmentId, 7);
+                $scopedDepartmentId = $this->resolveManagerScopeDepartmentId($user);
+                $primaryDepartment = $scopedDepartmentId ? Department::query()->find($scopedDepartmentId) : null;
+                $departmentAnalytics->ensureRecentWindow($scopedDepartmentId, 7);
 
                 $departmentMetricTrend = DepartmentMetric::query()
-                    ->where('department_id', $primaryDepartmentId)
+                    ->where('department_id', $scopedDepartmentId)
                     ->orderByDesc('metric_date')
                     ->take(7)
                     ->get()
@@ -178,16 +178,16 @@ class DashboardController extends Controller
                         ->values();
                 }
 
-                $managerOverview = $this->buildManagerOverview($primaryDepartmentId, $primaryDepartment, $departmentMetricTrend, $managerScale);
-                $managerSlaHealth = $this->buildManagerSlaHealth($primaryDepartmentId);
-                $managerSlaTimeline = $this->buildManagerSlaTimeline($primaryDepartmentId, 7);
+                $managerOverview = $this->buildManagerOverview($scopedDepartmentId, $primaryDepartment, $departmentMetricTrend, $managerScale);
+                $managerSlaHealth = $this->buildManagerSlaHealth($scopedDepartmentId);
+                $managerSlaTimeline = $this->buildManagerSlaTimeline($scopedDepartmentId, 7);
                 $managerHealthSummary = $this->buildManagerHealthSummary($managerOverview, $managerSlaHealth);
-                $managerAttentionQueue = $this->buildManagerAttentionQueue($user, $primaryDepartmentId);
+                $managerAttentionQueue = $this->buildManagerAttentionQueue($user, $scopedDepartmentId);
                 $managerTrendWindow = $this->resolveScaleWindow($managerScale);
-                $managerTicketTypeBreakdown = $this->buildManagerTicketTypeBreakdown($primaryDepartmentId);
+                $managerTicketTypeBreakdown = $this->buildManagerTicketTypeBreakdown($scopedDepartmentId);
 
                 $latestDepartmentMetric = DepartmentMetric::query()
-                    ->where('department_id', $primaryDepartmentId)
+                    ->where('department_id', $scopedDepartmentId)
                     ->latest('metric_date')
                     ->first();
 
@@ -207,7 +207,7 @@ class DashboardController extends Controller
                 if ($latestDepartmentMetric && $latestCompanyMetric) {
                     $windowStart = Carbon::now()->subDays(30);
                     $departmentClosedTickets = Ticket::query()
-                        ->where('department_id', $primaryDepartmentId)
+                        ->where('department_id', $scopedDepartmentId)
                         ->whereNotNull('closed_at')
                         ->where('closed_at', '>=', $windowStart)
                         ->get(['created_at', 'closed_at']);
@@ -678,6 +678,21 @@ class DashboardController extends Controller
             'end' => $end,
             'label' => $label,
         ];
+    }
+
+    protected function resolveManagerScopeDepartmentId(User $user): ?int
+    {
+        $managedDepartmentIds = $user->managedDepartments()->pluck('departments.id')->values();
+
+        if ($managedDepartmentIds->isEmpty()) {
+            return $user->primary_department_id;
+        }
+
+        if ($user->primary_department_id && $managedDepartmentIds->contains($user->primary_department_id)) {
+            return $user->primary_department_id;
+        }
+
+        return $managedDepartmentIds->first();
     }
 
     protected function buildEmployeeWorkToday(User $user, $snapshots, int $unreadAnnouncementCount, int $unreadConversationCount): ?array

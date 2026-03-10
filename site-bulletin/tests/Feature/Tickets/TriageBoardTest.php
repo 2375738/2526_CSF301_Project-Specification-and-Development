@@ -75,4 +75,33 @@ class TriageBoardTest extends TestCase
             ->get(route('tickets.triage'))
             ->assertForbidden();
     }
+
+    public function test_ops_manager_without_managed_departments_does_not_see_global_ticket_queue(): void
+    {
+        $department = Department::factory()->create(['name' => 'Inbound']);
+        $category = Category::factory()->create([
+            'name' => 'Facilities',
+            'audience' => 'all',
+        ]);
+        $opsManager = User::factory()->create(['role' => 'ops_manager']);
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $department->id,
+        ]);
+
+        Ticket::factory()->create([
+            'requester_id' => $employee->id,
+            'department_id' => $department->id,
+            'category_id' => $category->id,
+            'status' => 'new',
+            'title' => 'Inbound dock blocker',
+        ]);
+
+        $this->actingAs($opsManager)
+            ->get(route('tickets.triage'))
+            ->assertOk()
+            ->assertDontSeeText('Inbound dock blocker')
+            ->assertSeeText('No unassigned new tickets in the current triage scope.')
+            ->assertSeeText('No breached tickets in the current triage scope.');
+    }
 }

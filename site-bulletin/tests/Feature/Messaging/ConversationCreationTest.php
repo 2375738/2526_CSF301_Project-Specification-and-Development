@@ -146,4 +146,74 @@ class ConversationCreationTest extends TestCase
             'body' => 'Need help on station 14.',
         ]);
     }
+
+    public function test_forged_shortcut_request_without_available_recipient_returns_validation_error(): void
+    {
+        $employee = User::factory()->create(['role' => 'employee']);
+
+        $this->actingAs($employee)
+            ->from(route('messages.index'))
+            ->post(route('messages.store'), [
+                'shortcut' => 'my_manager',
+                'body' => 'Need help but no manager is configured.',
+            ])
+            ->assertRedirect(route('messages.index'))
+            ->assertSessionHasErrors('shortcut');
+
+        $this->assertSame(0, Conversation::count());
+    }
+
+    public function test_direct_shortcut_reuses_older_unlocked_conversation_when_newer_thread_is_locked(): void
+    {
+        $employee = User::factory()->create(['role' => 'employee']);
+        $manager = User::factory()->manager()->create();
+
+        ManagerRelationship::create([
+            'manager_id' => $employee->id,
+            'reports_to_id' => $manager->id,
+            'relationship_type' => 'direct',
+        ]);
+
+        $reusableConversation = Conversation::factory()
+            ->for($manager, 'creator')
+            ->create([
+                'subject' => 'Reusable manager thread',
+                'type' => 'direct',
+                'is_locked' => false,
+                'updated_at' => now()->subMinutes(10),
+            ]);
+
+        $reusableConversation->participants()->sync([
+            $manager->id => ['role' => 'owner', 'last_read_at' => now()],
+            $employee->id => ['role' => 'member', 'last_read_at' => now()],
+        ]);
+
+        $lockedConversation = Conversation::factory()
+            ->for($manager, 'creator')
+            ->create([
+                'subject' => 'Locked manager thread',
+                'type' => 'direct',
+                'is_locked' => true,
+                'updated_at' => now(),
+            ]);
+
+        $lockedConversation->participants()->sync([
+            $manager->id => ['role' => 'owner', 'last_read_at' => now()],
+            $employee->id => ['role' => 'member', 'last_read_at' => now()],
+        ]);
+
+        $this->actingAs($employee)
+            ->post(route('messages.store'), [
+                'shortcut' => 'my_manager',
+                'body' => 'Need support on this shift.',
+            ])
+            ->assertRedirect(route('messages.show', $reusableConversation));
+
+        $this->assertSame(2, Conversation::count());
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $reusableConversation->id,
+            'sender_id' => $employee->id,
+            'body' => 'Need support on this shift.',
+        ]);
+    }
 }

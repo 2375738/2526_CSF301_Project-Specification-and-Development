@@ -38,9 +38,14 @@ class KnowledgeSnippet extends Model
     public function scopeVisibleTo(Builder $query, ?User $user): Builder
     {
         $deptIds = $user ? $user->departmentIds() : collect();
-        $isManager = $user && ($user->isManager() || $user->isHr() || $user->isOpsManager());
+        $canSeeManagerContent = $user && (
+            $user->isManager()
+            || $user->isHr()
+            || $user->isOpsManager()
+            || $user->isAdmin()
+        );
 
-        return $query->where(function (Builder $q) use ($deptIds, $isManager) {
+        return $query->where(function (Builder $q) use ($deptIds, $canSeeManagerContent) {
             $q->where('audience', 'all');
 
             if ($deptIds->isNotEmpty()) {
@@ -50,7 +55,7 @@ class KnowledgeSnippet extends Model
                 });
             }
 
-            if ($isManager) {
+            if ($canSeeManagerContent) {
                 $q->orWhere('audience', 'managers');
             }
         });

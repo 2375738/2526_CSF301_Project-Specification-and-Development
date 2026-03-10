@@ -100,7 +100,7 @@ class Announcement extends Model
                 });
             }
 
-            if ($user && ($user->isManager() || $user->isHr() || $user->isOpsManager())) {
+            if ($user && ($user->isManager() || $user->isHr() || $user->isOpsManager() || $user->isAdmin())) {
                 $q->orWhere('audience', 'managers');
             }
         });
