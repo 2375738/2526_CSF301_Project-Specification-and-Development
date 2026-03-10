@@ -57,6 +57,52 @@
     <div class="grid gap-6 md:grid-cols-3">
       <div class="md:col-span-2 space-y-6">
         <section class="bg-white shadow-sm rounded-xl px-6 py-5">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">What This Means</h2>
+              <p class="mt-1 text-sm text-slate-600">{{ $lifecycle['headline'] }}</p>
+            </div>
+            <span @class([
+              'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
+              'bg-amber-100 text-amber-700' => $lifecycle['isRequesterActionRequired'],
+              'bg-blue-100 text-blue-700' => ! $lifecycle['isRequesterActionRequired'],
+            ])>
+              {{ $lifecycle['statusLabel'] }}
+            </span>
+          </div>
+
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 px-4 py-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Who is handling this</p>
+              <p class="mt-1 text-sm font-semibold text-slate-800">{{ $lifecycle['ownerLabel'] }}</p>
+              <p class="mt-2 text-sm text-slate-600">{{ $lifecycle['ownerDetail'] }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 px-4 py-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">What happens next</p>
+              <p class="mt-1 text-sm text-slate-700">{{ $lifecycle['nextStep'] }}</p>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-4 md:grid-cols-3">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Latest visible update</p>
+              <p class="mt-1 text-sm font-semibold text-slate-800">{{ $lifecycle['latestVisibleUpdate'] }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Service note</p>
+              <p class="mt-1 text-sm text-slate-700">{{ $lifecycle['serviceNote'] }}</p>
+            </div>
+          </div>
+
+          @if ($lifecycle['requesterActionLabel'])
+            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">{{ $lifecycle['requesterActionLabel'] }}</p>
+              <p class="mt-1 text-sm text-amber-900">{{ $lifecycle['requesterActionDetail'] }}</p>
+            </div>
+          @endif
+        </section>
+
+        <section class="bg-white shadow-sm rounded-xl px-6 py-5">
           <h2 class="text-lg font-semibold text-slate-900">Service Targets</h2>
           <div class="mt-4 grid gap-4 md:grid-cols-2">
             <div class="rounded-lg border border-slate-200 px-4 py-3">
@@ -85,16 +131,18 @@
         <section class="bg-white shadow-sm rounded-xl px-6 py-5">
           <h2 class="text-lg font-semibold text-slate-900">Status Timeline</h2>
           <ul class="mt-4 space-y-4">
-            @forelse ($ticket->statusChanges as $change)
+            @forelse ($timelineEntries as $entry)
+              @php($change = $entry['change'])
               <li class="relative border-l-2 border-slate-200 pl-4">
                 <div class="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-blue-500"></div>
                 <p class="text-sm font-semibold text-slate-800">
-                  {{ ucfirst(str_replace('_', ' ', $change->to_status->value ?? $change->to_status)) }}
+                  {{ $entry['headline'] }}
                   @if ($change->user)
                     <span class="font-normal text-slate-500">by {{ $change->user->name }}</span>
                   @endif
                 </p>
                 <p class="text-xs text-slate-500">{{ $change->created_at->format('M j, Y H:i') }}</p>
+                <p class="mt-1 text-sm text-slate-600">{{ $entry['detail'] }}</p>
                 @if ($change->reason)
                   <p class="mt-1 text-sm text-slate-600">{{ $change->reason }}</p>
                 @endif

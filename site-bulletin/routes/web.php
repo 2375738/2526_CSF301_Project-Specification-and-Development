@@ -8,10 +8,12 @@ use App\Http\Controllers\Public\DashboardController;
 use App\Http\Controllers\Public\GovernanceController;
 use App\Http\Controllers\Public\ReportTicketController;
 use App\Http\Controllers\Public\RoleChangeRequestController;
+use App\Http\Controllers\Public\KnowledgeSnippetController;
 use App\Http\Controllers\Public\TicketAttachmentController;
 use App\Http\Controllers\Public\TicketCommentController;
 use App\Http\Controllers\Public\TicketStatusController;
 use App\Http\Controllers\Public\TicketViewController;
+use App\Http\Controllers\Public\SupportTriageBoardController;
 use App\Http\Controllers\Messaging\ConversationController;
 use App\Http\Controllers\Messaging\MessageController;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +25,9 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('tickets')->name('tickets.')->group(function () {
         Route::get('/', [TicketViewController::class, 'index'])->name('index');
+        Route::get('/triage', SupportTriageBoardController::class)
+            ->name('triage')
+            ->middleware('role:ops_manager,hr,admin');
 
         Route::middleware('role:employee,manager,ops_manager,hr,admin')->group(function () {
             Route::get('/report', [ReportTicketController::class, 'create'])->name('create');
@@ -74,11 +79,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/escalation', [GovernanceController::class, 'escalation'])->name('escalation');
     });
 
+    Route::get('/knowledge', [KnowledgeSnippetController::class, 'index'])->name('knowledge.index');
+
     Route::prefix('announcements')->name('announcements.')->group(function () {
         Route::get('/', [AnnouncementController::class, 'index'])->name('index');
         Route::post('/', [AnnouncementController::class, 'store'])->name('store');
         Route::get('/{announcement}', [AnnouncementController::class, 'show'])->name('show');
         Route::patch('/{announcement}/read', [AnnouncementController::class, 'markRead'])->name('read');
+        Route::patch('/{announcement}/acknowledge', [AnnouncementController::class, 'acknowledge'])->name('acknowledge');
         Route::post('/read-all', [AnnouncementController::class, 'markAllRead'])->name('read-all');
     });
 

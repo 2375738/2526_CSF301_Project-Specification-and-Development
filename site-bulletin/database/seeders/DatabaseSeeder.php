@@ -22,25 +22,23 @@ use App\Models\ManagerRelationship;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\RoleChangeRequest;
+use App\Models\DepartmentMetric;
+use App\Models\KnowledgeSnippet;
 use App\Services\SLAService;
+use App\Services\DepartmentAnalyticsService;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
         $this->call(DepartmentSeeder::class);
+        $this->call(DepartmentOperationsProfileSeeder::class);
 
-        $departments = Department::all()->keyBy('slug');
-
-        // Ensure we have these departments
-        $deptNames = ['inbound-operations', 'outbound-operations', 'people-experience', 'safety', 'facilities', 'it-support'];
-        foreach ($deptNames as $slug) {
-            if (!$departments->has($slug)) {
-                $name = ucwords(str_replace('-', ' ', $slug));
-                $dept = Department::create(['name' => $name, 'slug' => $slug]);
-                $departments->put($slug, $dept);
-            }
-        }
+        $coreDepartmentSlugs = ['customer-returns', 'kariba', 'inbound', 'icqa', 'outbound', 'support', 'tom'];
+        $departments = Department::query()
+            ->whereIn('slug', $coreDepartmentSlugs)
+            ->get()
+            ->keyBy('slug');
 
         // --- Key Users (for Demo/Testing) ---
         $admin = User::updateOrCreate(
@@ -96,8 +94,8 @@ class DatabaseSeeder extends Seeder
         );
 
         // --- Assign Departments & Relationships for Key Users ---
-        $inbound = $departments->get('inbound-operations');
-        $people = $departments->get('people-experience');
+        $inbound = $departments->get('inbound');
+        $support = $departments->get('support');
 
         $assignDepartment = function (User $user, Department $department, string $role, bool $primary = false): void {
             if ($primary) {
@@ -110,7 +108,7 @@ class DatabaseSeeder extends Seeder
         };
 
         $assignDepartment($admin, $inbound, 'manager', true); // Admin technically oversees everything, but primary here
-        $assignDepartment($hr, $people, 'hr_manager', true);
+        $assignDepartment($hr, $support ?? $inbound, 'hr_manager', true);
         $assignDepartment($mgr, $inbound, 'manager', true);
         $assignDepartment($emp, $inbound, 'member', true);
 
@@ -128,14 +126,13 @@ class DatabaseSeeder extends Seeder
             // but let's add more people to them too to make it busy.
             
             // 1. Create a Department Manager (if not already covered by key users)
-            if ($slug === 'inbound-operations') {
+            if ($slug === 'inbound') {
                 $deptManager = $mgr;
-            } elseif ($slug === 'people-experience') {
-                $deptManager = $hr;
             } else {
-                $deptManager = User::create([
-                    'name' => $faker->name,
+                $deptManager = User::updateOrCreate([
                     'email' => $slug . '.manager@example.com',
+                ], [
+                    'name' => $faker->name,
                     'password' => Hash::make('password'),
                     'role' => 'manager',
                     'job_title' => 'Area Manager',
@@ -147,9 +144,10 @@ class DatabaseSeeder extends Seeder
                 $assignDepartment($deptManager, $dept, 'manager', true);
                 
                 // Report to Admin (Site Lead)
-                ManagerRelationship::create([
+                ManagerRelationship::updateOrCreate([
                     'manager_id' => $deptManager->id,
                     'reports_to_id' => $admin->id,
+                ], [
                     'relationship_type' => 'direct',
                 ]);
             }
@@ -157,9 +155,10 @@ class DatabaseSeeder extends Seeder
             // 2. Create Employees for this Department
             $employeeCount = rand(5, 12);
             for ($i = 0; $i < $employeeCount; $i++) {
-                $employee = User::create([
-                    'name' => $faker->name,
+                $employee = User::updateOrCreate([
                     'email' => str_replace('-', '.', $slug) . '.emp' . $i . '@example.com',
+                ], [
+                    'name' => $faker->name,
                     'password' => Hash::make('password'),
                     'role' => 'employee',
                     'job_title' => $faker->randomElement(['Associate I', 'Associate II', 'Process Assistant', 'Specialist']),
@@ -171,9 +170,10 @@ class DatabaseSeeder extends Seeder
                 $assignDepartment($employee, $dept, 'member', true);
 
                 // Report to Department Manager
-                ManagerRelationship::create([
+                ManagerRelationship::updateOrCreate([
                     'manager_id' => $employee->id,
                     'reports_to_id' => $deptManager->id,
+                ], [
                     'relationship_type' => 'direct',
                 ]);
             }
@@ -192,24 +192,29 @@ class DatabaseSeeder extends Seeder
                     'is_sensitive' => false,
                     'audience' => 'all',
                 ],
-                'My Site' => [
+                'Current Vacancies' => [
                     'order' => 1,
                     'is_sensitive' => false,
                     'audience' => 'all',
                 ],
-                'Diversity, Equity & Inclusion' => [
+                'My Site' => [
                     'order' => 2,
                     'is_sensitive' => false,
                     'audience' => 'all',
                 ],
-                'PxT' => [
+                'Diversity, Equity & Inclusion' => [
                     'order' => 3,
+                    'is_sensitive' => false,
+                    'audience' => 'all',
+                ],
+                'PxT' => [
+                    'order' => 4,
                     'is_sensitive' => true,
                     'audience' => 'department',
-                    'department_id' => $people->id ?? null,
+                    'department_id' => $support?->id ?? null,
                 ],
                 'Site Tools' => [
-                    'order' => 4,
+                    'order' => 5,
                     'is_sensitive' => false,
                     'audience' => 'all',
                 ],
@@ -232,7 +237,7 @@ class DatabaseSeeder extends Seeder
                 if ($categoryData['audience'] !== 'department') {
                     $categoryData['department_id'] = null;
                 } elseif (! $categoryData['department_id']) {
-                    $categoryData['department_id'] = $people?->id ?? $inbound?->id;
+                    $categoryData['department_id'] = $support?->id ?? $inbound?->id;
                 }
 
                 $category = Category::updateOrCreate(
@@ -295,7 +300,7 @@ class DatabaseSeeder extends Seeder
                     'order' => 3,
                     'is_sensitive' => true,
                     'audience' => 'department',
-                    'department_id' => $people->id ?? null,
+                    'department_id' => $support->id ?? null,
                 ],
             ])->map(
                 fn ($c) => Category::updateOrCreate(['name' => $c['name']], $c)
@@ -314,6 +319,32 @@ class DatabaseSeeder extends Seeder
                     ]);
             }
         }
+
+        // Keep quick links aligned to Linktree snapshot only.
+        if ($generalInfoCategory = Category::query()->where('name', 'General Information')->first()) {
+            Link::query()->where('category_id', $generalInfoCategory->id)->delete();
+            $generalInfoCategory->delete();
+        }
+
+        // Dedicated operational ticket categories (separate from link categories).
+        $ticketCategories = collect([
+            ['name' => 'Safety', 'audience' => 'all', 'is_sensitive' => false],
+            ['name' => 'HR', 'audience' => 'all', 'is_sensitive' => false],
+            ['name' => 'Facilities', 'audience' => 'all', 'is_sensitive' => false],
+            ['name' => 'IT Support', 'audience' => 'all', 'is_sensitive' => false],
+            ['name' => 'Operations', 'audience' => 'all', 'is_sensitive' => false],
+            ['name' => 'Transport', 'audience' => 'all', 'is_sensitive' => false],
+        ])->map(function (array $category, int $index) {
+            return Category::updateOrCreate(
+                ['name' => $category['name']],
+                [
+                    'order' => 200 + $index,
+                    'is_sensitive' => $category['is_sensitive'],
+                    'audience' => $category['audience'],
+                    'department_id' => null,
+                ]
+            );
+        });
 
         // Announcements
         $globalAuthor = $hr ?? $admin;
@@ -344,6 +375,84 @@ class DatabaseSeeder extends Seeder
             ])->create();
         }
 
+        Announcement::updateOrCreate(
+            ['title' => 'Parking Rota Updated for This Week'],
+            [
+                'body' => 'Parking rota and overflow guidance are now published in General Information links.',
+                'audience' => 'all',
+                'department_id' => null,
+                'author_id' => $globalAuthor->id,
+                'is_pinned' => false,
+                'starts_at' => now()->subHours(6),
+                'ends_at' => now()->addDays(6),
+                'priority' => 'medium',
+            ]
+        );
+
+        Announcement::updateOrCreate(
+            ['title' => 'Shift Start Reminder (Days and Nights)'],
+            [
+                'body' => 'Day shift starts at 10:00. Night shift starts at 18:30. Please arrive 10 minutes early for handover.',
+                'audience' => 'all',
+                'department_id' => null,
+                'author_id' => $globalAuthor->id,
+                'is_pinned' => false,
+                'starts_at' => now()->subDay(),
+                'ends_at' => now()->addDays(5),
+                'priority' => 'low',
+            ]
+        );
+
+        KnowledgeSnippet::updateOrCreate(
+            ['title' => 'Scanner reset steps'],
+            [
+                'summary' => 'Quick recovery steps when a handheld scanner freezes or drops connection.',
+                'body' => "1. Remove and reseat the battery.\n2. Restart the device and reconnect to Wi-Fi.\n3. If the issue returns, record the asset tag and raise a ticket.",
+                'department_id' => null,
+                'audience' => 'all',
+                'is_active' => true,
+                'order' => 0,
+            ]
+        );
+
+        KnowledgeSnippet::updateOrCreate(
+            ['title' => 'Missed punch route'],
+            [
+                'summary' => 'What to do when your shift punch is missing or incorrect.',
+                'body' => "Check A to Z first.\nIf the punch is still missing, message your manager or HR and include the shift date, expected start/end time, and your badge ID.",
+                'department_id' => null,
+                'audience' => 'all',
+                'is_active' => true,
+                'order' => 1,
+            ]
+        );
+
+        KnowledgeSnippet::updateOrCreate(
+            ['title' => 'Transport escalation'],
+            [
+                'summary' => 'Use this path when the shuttle or transport contact is late or missing.',
+                'body' => "1. Check the latest site announcement for route changes.\n2. Contact transport support through Site Bulletin or the posted transport line.\n3. If service is still missing, raise a transport ticket with route and stop details.",
+                'department_id' => null,
+                'audience' => 'all',
+                'is_active' => true,
+                'order' => 2,
+            ]
+        );
+
+        if ($support) {
+            KnowledgeSnippet::updateOrCreate(
+                ['title' => 'Manager-only escalation pack'],
+                [
+                    'summary' => 'Short guidance for manager escalations on repeat operational blockers.',
+                    'body' => "Use this when the same blocker repeats across the shift.\nCollect ticket IDs, affected area, and current workaround before escalating to site leadership.",
+                    'department_id' => $support->id,
+                    'audience' => 'managers',
+                    'is_active' => true,
+                    'order' => 3,
+                ]
+            );
+        }
+
         // SLA defaults
         foreach (['low' => 1440, 'medium' => 1440, 'high' => 720, 'critical' => 240] as $p => $resMins) {
             SLASetting::updateOrCreate(
@@ -356,77 +465,218 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // Tickets (mix)
-        for ($i = 1; $i <= 20; $i++) {
+        $departmentUsers = $departments->mapWithKeys(function (Department $department) {
+            $members = User::query()
+                ->where(function ($query) use ($department) {
+                    $query->where('primary_department_id', $department->id)
+                        ->orWhereHas('departments', fn ($departmentQuery) => $departmentQuery
+                            ->where('departments.id', $department->id));
+                })
+                ->get(['id', 'role', 'primary_department_id']);
+
+            $managers = $members->filter(fn (User $user) => $user->role?->value === 'manager')->values();
+            $employees = $members->filter(fn (User $user) => $user->role?->value === 'employee')->values();
+
+            return [$department->id => [
+                'department' => $department,
+                'members' => $members,
+                'managers' => $managers,
+                'employees' => $employees,
+            ]];
+        });
+
+        // Tickets (mix) with realistic SLA timing spread and true multi-department distribution.
+        $ticketCounter = 1;
+        foreach ($departmentUsers as $departmentId => $bundle) {
+            $department = $bundle['department'];
+            $deptManagers = $bundle['managers'];
+            $deptEmployees = $bundle['employees'];
+            $deptMembers = $bundle['members'];
+
+            $ticketTarget = match ($department->slug) {
+                'inbound' => 26,
+                'outbound' => 22,
+                'customer-returns' => 18,
+                'kariba' => 16,
+                'icqa' => 14,
+                'support' => 12,
+                'tom' => 10,
+                default => 12,
+            };
+
+            for ($i = 0; $i < $ticketTarget; $i++) {
             $priority = collect(['low', 'medium', 'high', 'critical'])->random();
-            $statusTrail = [
-                ['from' => null, 'to' => 'new', 'comment' => 'Ticket opened by requester'],
-                ['from' => 'new', 'to' => 'triaged', 'comment' => 'Acknowledged by manager'],
-            ];
+            $targets = $slaService->targets($priority);
 
-            if (rand(0, 1)) {
-                $statusTrail[] = ['from' => 'triaged', 'to' => 'in_progress', 'comment' => 'Work in progress'];
+            $isClosedFlow = rand(1, 100) <= 52;
+            $finalStatus = $isClosedFlow
+                ? collect(['resolved', 'closed'])->random()
+                : collect(['triaged', 'in_progress', 'waiting_employee'])->random();
+            if (! $isClosedFlow) {
+                $priorityRoll = rand(1, 100);
+                $priority = match (true) {
+                    $priorityRoll <= 35 => 'low',
+                    $priorityRoll <= 75 => 'medium',
+                    $priorityRoll <= 95 => 'high',
+                    default => 'critical',
+                };
+                $targets = $slaService->targets($priority);
             }
 
-            if (rand(0, 1)) {
-                $statusTrail[] = ['from' => 'in_progress', 'to' => 'waiting_employee', 'comment' => 'Need more info from requester'];
+            $assignee = $deptManagers->first() ?? $mgr;
+            $requester = $deptEmployees->isNotEmpty()
+                ? $deptEmployees->random()
+                : ($deptMembers->first() ?? $emp);
+            $affectedUser = $deptEmployees->isNotEmpty() ? $deptEmployees->random() : $requester;
+
+            $dayOffset = rand(0, 6);
+            $createdAt = now()->subDays($dayOffset)->subHours(rand(0, 20))->subMinutes(rand(0, 59));
+
+            $firstResponseBreachedSeed = rand(1, 100) <= 25;
+            $firstResponseMinutes = $firstResponseBreachedSeed
+                ? rand((int) max(5, $targets['first_response_minutes'] + 10), (int) max(20, $targets['first_response_minutes'] * 2))
+                : rand(5, (int) max(6, $targets['first_response_minutes'] * 0.9));
+            $triagedAt = $createdAt->copy()->addMinutes($firstResponseMinutes);
+
+            if ($isClosedFlow) {
+                $resolutionBreachedSeed = rand(1, 100) <= 30;
+                $resolutionMinutes = $resolutionBreachedSeed
+                    ? rand((int) max(60, $targets['resolution_minutes'] + 30), (int) max(120, $targets['resolution_minutes'] * 2))
+                    : rand((int) max(45, $targets['resolution_minutes'] * 0.45), (int) max(60, $targets['resolution_minutes'] * 0.95));
+
+                $closedAt = $createdAt->copy()->addMinutes($resolutionMinutes);
+                if ($closedAt->greaterThan(now()->subMinutes(10))) {
+                    $closedAt = now()->subMinutes(rand(30, 360));
+                }
+                $updatedAt = $closedAt->copy();
+            } else {
+                $closedAt = null;
+                $openMode = rand(1, 100); // Keep most open tickets within SLA, some near risk, fewer breached.
+                if ($openMode <= 58) {
+                    $ageMinutes = rand(20, (int) max(30, $targets['resolution_minutes'] * 0.55));
+                } elseif ($openMode <= 85) {
+                    $ageMinutes = rand((int) max(40, $targets['resolution_minutes'] * 0.56), (int) max(60, $targets['resolution_minutes'] * 0.95));
+                } else {
+                    $ageMinutes = rand((int) max(80, $targets['resolution_minutes'] * 1.05), (int) max(120, $targets['resolution_minutes'] * 1.45));
+                }
+
+                $createdAt = now()->subMinutes($ageMinutes);
+                $triagedAt = $createdAt->copy()->addMinutes($firstResponseMinutes);
+                $updatedAt = now()->subMinutes(rand(5, 180));
             }
 
-            $finalStatus = collect(['resolved', 'closed', 'in_progress', 'waiting_employee'])->random();
-            $previousStatus = $statusTrail[array_key_last($statusTrail)]['to'];
-            $statusTrail[] = ['from' => $previousStatus, 'to' => $finalStatus, 'comment' => ''];
-
-            $requester = rand(0, 1) ? $emp : $mgr;
-            $affectedUser = $requester;
-
-            if ($requester->id === $mgr->id) {
-                $affectedUser = $emp;
+            if ($triagedAt->greaterThan($updatedAt->copy()->subMinutes(5))) {
+                $triagedAt = $updatedAt->copy()->subMinutes(rand(15, 90));
             }
 
-            $createdAt = now()->subDays(rand(0, 14));
+            $statusPath = match ($finalStatus) {
+                'waiting_employee' => ['new', 'triaged', 'in_progress', 'waiting_employee'],
+                'in_progress' => ['new', 'triaged', 'in_progress'],
+                'resolved' => ['new', 'triaged', 'in_progress', 'resolved'],
+                'closed' => ['new', 'triaged', 'in_progress', 'resolved', 'closed'],
+                default => ['new', 'triaged'],
+            };
+
+            $statusTrail = [];
+            $newAt = $createdAt->copy()->addMinutes(1);
+            $statusTrail[] = ['from' => null, 'to' => 'new', 'comment' => 'Ticket opened by requester', 'at' => $newAt];
+            $statusTrail[] = ['from' => 'new', 'to' => 'triaged', 'comment' => 'Acknowledged by manager', 'at' => $triagedAt];
+
+            $remainingStatuses = array_slice($statusPath, 2);
+            $cursor = $triagedAt->copy();
+            $remainingMinutes = max(30, $cursor->diffInMinutes($updatedAt, false));
+            $steps = max(1, count($remainingStatuses));
+            $stepMinutes = max(20, (int) floor($remainingMinutes / $steps));
+            $currentFrom = 'triaged';
+
+            foreach ($remainingStatuses as $index => $toStatus) {
+                $isLast = $index === count($remainingStatuses) - 1;
+                $at = $isLast
+                    ? $updatedAt->copy()
+                    : $cursor->copy()->addMinutes($stepMinutes * ($index + 1));
+
+                if ($at->greaterThan($updatedAt)) {
+                    $at = $updatedAt->copy()->subMinutes(max(1, count($remainingStatuses) - $index));
+                }
+
+                $comment = match ($toStatus) {
+                    'in_progress' => 'Work in progress',
+                    'waiting_employee' => 'Need more info from requester',
+                    'resolved' => 'Issue resolved by operations',
+                    'closed' => 'Ticket closed',
+                    default => null,
+                };
+
+                $statusTrail[] = [
+                    'from' => $currentFrom,
+                    'to' => $toStatus,
+                    'comment' => $comment,
+                    'at' => $at,
+                ];
+
+                $currentFrom = $toStatus;
+            }
 
             $ticket = Ticket::create([
                 'requester_id' => $requester->id,
-                'assignee_id' => $mgr->id,
+                'assignee_id' => $assignee?->id,
                 'created_for_id' => $affectedUser->id,
-                'department_id' => $affectedUser->primary_department_id ?? $inbound->id ?? null,
-                'category_id' => $cats->random()->id,
+                'department_id' => $departmentId,
+                'category_id' => $ticketCategories->random()->id,
                 'priority' => $priority,
                 'status' => $finalStatus,
-                'title' => 'Issue #' . $i,
-                'description' => 'Demo ticket ' . $i,
+                'title' => strtoupper($department->ops_code ?? $department->slug) . ' issue #' . $ticketCounter,
+                'description' => 'Seeded ticket for ' . $department->name . ' (' . ($ticketCounter) . ')',
                 'location' => collect(['Gate B', 'Canteen', 'Inbound Dock', 'Office'])->random(),
-                'closed_at' => in_array($finalStatus, ['resolved', 'closed'], true) ? now()->subDays(rand(0, 2)) : null,
+                'closed_at' => in_array($finalStatus, ['resolved', 'closed'], true) ? $closedAt : null,
             ]);
 
             $ticket->forceFill([
                 'created_at' => $createdAt,
-                'updated_at' => $createdAt->copy()->addHours(rand(1, 72)),
+                'updated_at' => $updatedAt,
             ])->saveQuietly();
 
             foreach ($statusTrail as $step) {
-                TicketStatusChange::create([
+                $change = TicketStatusChange::create([
                     'ticket_id' => $ticket->id,
-                    'user_id' => $step['from'] === null ? $requester->id : $mgr->id,
+                    'user_id' => $step['from'] === null ? $requester->id : ($assignee?->id ?? $mgr->id),
                     'from_status' => $step['from'],
                     'to_status' => $step['to'],
                     'reason' => $step['comment'] ?: null,
                 ]);
+
+                $change->forceFill([
+                    'created_at' => $step['at'],
+                    'updated_at' => $step['at'],
+                ])->saveQuietly();
             }
 
-            TicketComment::create([
+            $managerComment = TicketComment::create([
                 'ticket_id' => $ticket->id,
-                'user_id' => $mgr->id,
+                'user_id' => $assignee?->id ?? $mgr->id,
                 'body' => 'Acknowledged. Working on it.',
                 'is_private' => false,
             ]);
+            $managerCommentAt = $triagedAt->copy()->addMinutes(rand(5, 30));
+            $managerComment->forceFill([
+                'created_at' => $managerCommentAt,
+                'updated_at' => $managerCommentAt,
+            ])->saveQuietly();
 
-            TicketComment::create([
+            $requesterComment = TicketComment::create([
                 'ticket_id' => $ticket->id,
                 'user_id' => $requester->id,
                 'body' => 'Thanks for the update!',
                 'is_private' => false,
             ]);
+            $requesterCommentAt = $managerCommentAt->copy()->addMinutes(rand(20, 180));
+            if ($requesterCommentAt->greaterThan($updatedAt)) {
+                $requesterCommentAt = $updatedAt->copy()->subMinutes(rand(1, 20));
+            }
+            $requesterComment->forceFill([
+                'created_at' => $requesterCommentAt,
+                'updated_at' => $requesterCommentAt,
+            ])->saveQuietly();
 
             if ($i <= 5) {
                 TicketAttachment::create([
@@ -446,6 +696,9 @@ class DatabaseSeeder extends Seeder
                 'sla_first_response_breached' => $sla['first_response_breached'],
                 'sla_resolution_breached' => $sla['resolution_breached'],
             ])->saveQuietly();
+
+            $ticketCounter++;
+            }
         }
 
         // Performance snapshots (6 weeks for each user)
@@ -468,7 +721,7 @@ class DatabaseSeeder extends Seeder
         }
 
         // Conversations & Messages
-        $directConversation = Conversation::create([
+        $directConversation = Conversation::firstOrCreate([
             'subject' => 'Follow-up on ticket queue',
             'type' => 'direct',
             'creator_id' => $mgr->id,
@@ -479,37 +732,51 @@ class DatabaseSeeder extends Seeder
             $emp->id => ['role' => 'member', 'last_read_at' => null],
         ]);
 
-        Message::create([
+        Message::firstOrCreate([
             'conversation_id' => $directConversation->id,
             'sender_id' => $mgr->id,
             'body' => 'Hey, can you update ticket #12 before stand-up?',
         ]);
 
-        if ($inbound) {
-            $deptConversation = Conversation::create([
-                'subject' => 'Inbound Operations Update',
+        foreach ($departments as $department) {
+            $conversationOwner = $departmentUsers->get($department->id)['managers']->first() ?? $mgr;
+            $deptConversation = Conversation::firstOrCreate([
+                'subject' => $department->name . ' Operations Update',
                 'type' => 'department',
-                'creator_id' => $hr->id ?? $admin->id,
-                'department_id' => $inbound->id,
+                'creator_id' => $conversationOwner->id,
+                'department_id' => $department->id,
             ]);
 
-            $participantIds = $inbound
-                ? $inbound->members()->pluck('users.id')->merge([$hr->id ?? $admin->id])->unique()->all()
-                : [$mgr->id, $emp->id, $hr->id ?? $admin->id];
+            $participantIds = $department
+                ->members()
+                ->pluck('users.id')
+                ->merge([$conversationOwner->id, $admin->id])
+                ->unique()
+                ->all();
 
-            $syncData = collect($participantIds)->mapWithKeys(function ($id) use ($hr, $admin) {
+            $syncData = collect($participantIds)->mapWithKeys(function ($id) {
                 return [$id => ['role' => 'member', 'last_read_at' => null]];
             })->toArray();
 
             $deptConversation->participants()->sync($syncData);
             $deptConversation->participants()
-                ->updateExistingPivot($hr->id ?? $admin->id, ['role' => 'owner', 'last_read_at' => now()]);
+                ->updateExistingPivot($conversationOwner->id, ['role' => 'owner', 'last_read_at' => now()]);
 
-            Message::create([
+            Message::firstOrCreate([
                 'conversation_id' => $deptConversation->id,
-                'sender_id' => $hr->id ?? $admin->id,
-                'body' => 'Reminder: safety walkthrough tomorrow at 09:00. Please confirm attendance here.',
+                'sender_id' => $conversationOwner->id,
+                'body' => sprintf(
+                    '%s shift note: focus on safety, quality checks, and backlog clearance this shift.',
+                    $department->name
+                ),
             ]);
+        }
+
+        // Recalculate metrics from seeded tickets/messages for a consistent 7-day manager view.
+        DepartmentMetric::query()->delete();
+        $departmentAnalytics = app(DepartmentAnalyticsService::class);
+        foreach (range(6, 0) as $offset) {
+            $departmentAnalytics->recalculateForDate(now()->subDays($offset));
         }
 
         // Mark a sample duplicate chain

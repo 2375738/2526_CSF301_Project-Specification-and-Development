@@ -16,6 +16,7 @@ class ConversationStoreRequest extends FormRequest
         return [
             'subject' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'in:direct,department'],
+            'shortcut' => ['nullable', 'in:my_manager,support_team,hr_team'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'recipients' => ['nullable', 'array'],
             'recipients.*' => ['integer', 'exists:users,id'],

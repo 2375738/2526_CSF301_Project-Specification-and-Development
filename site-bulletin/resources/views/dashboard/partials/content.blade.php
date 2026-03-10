@@ -48,6 +48,10 @@
     </div>
   </section>
 
+  @include('dashboard.partials.my-work-today', [
+      'employeeWorkToday' => $employeeWorkToday ?? null,
+  ])
+
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
       <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Announcements</p>
@@ -73,6 +77,10 @@
     @endauth
   </section>
 
+  @include('dashboard.partials.manager-attention-queue', [
+      'managerAttentionQueue' => $managerAttentionQueue ?? null,
+  ])
+
   @include('dashboard.partials.trend-panels', [
       'snapshots' => $snapshots,
       'departmentMetricTrend' => $departmentMetricTrend,
@@ -85,10 +93,6 @@
 
   @include('dashboard.partials.governance-widget', [
       'governanceLogs' => $governanceLogs,
-  ])
-
-  @include('dashboard.partials.analytics-widget', [
-      'departmentMetricTrend' => $departmentMetricTrend,
   ])
 
   @include('dashboard.partials.news-widget', [

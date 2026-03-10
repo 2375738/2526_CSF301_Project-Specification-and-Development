@@ -12,10 +12,13 @@ class DepartmentSeeder extends Seeder
      * @var array<int, array<string,string>>
      */
     protected array $departments = [
-        ['name' => 'Inbound Operations', 'color' => '#0f172a'],
-        ['name' => 'Outbound Operations', 'color' => '#1d4ed8'],
-        ['name' => 'Facilities & Safety', 'color' => '#059669'],
-        ['name' => 'People Experience', 'color' => '#db2777'],
+        ['name' => 'Customer Returns', 'color' => '#0f766e'],
+        ['name' => 'Kariba', 'color' => '#0369a1'],
+        ['name' => 'Inbound', 'color' => '#1d4ed8'],
+        ['name' => 'ICQA', 'color' => '#7c3aed'],
+        ['name' => 'Outbound', 'color' => '#059669'],
+        ['name' => 'Support', 'color' => '#334155'],
+        ['name' => 'TOM', 'color' => '#b45309'],
     ];
 
     public function run(): void

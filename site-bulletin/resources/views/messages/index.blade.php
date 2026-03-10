@@ -159,6 +159,36 @@
 
       <div class="space-y-4">
         @can('create', App\Models\Conversation::class)
+          @if (($shortcutOptions ?? collect())->isNotEmpty())
+            <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 class="text-lg font-semibold text-slate-900">Quick Contact</h2>
+              <p class="mt-1 text-sm text-slate-600">Use routed shortcuts when you already know who should handle the question.</p>
+              <div class="mt-4 space-y-4">
+                @foreach ($shortcutOptions as $shortcut)
+                  <form method="POST" action="{{ route('messages.store') }}" class="rounded-lg border border-slate-200 p-4 space-y-3">
+                    @csrf
+                    <input type="hidden" name="shortcut" value="{{ $shortcut['key'] }}">
+                    <div>
+                      <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold text-slate-900">{{ $shortcut['label'] }}</h3>
+                        <span class="text-xs font-medium text-slate-500">{{ ucfirst(str_replace('_', ' ', $shortcut['recipient_role'])) }}</span>
+                      </div>
+                      <p class="mt-1 text-xs text-slate-500">{{ $shortcut['description'] }}</p>
+                      <p class="mt-2 text-sm text-slate-700">Target: <span class="font-semibold">{{ $shortcut['recipient_name'] }}</span></p>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-700">
+                      Message
+                      <textarea name="body" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>{{ old('shortcut') === $shortcut['key'] ? old('body') : '' }}</textarea>
+                    </label>
+                    <button type="submit" class="inline-flex w-full justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                      Send
+                    </button>
+                  </form>
+                @endforeach
+              </div>
+            </div>
+          @endif
+
           <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="text-lg font-semibold text-slate-900">Start Conversation</h2>
             <form method="POST" action="{{ route('messages.store') }}" class="mt-4 space-y-3">

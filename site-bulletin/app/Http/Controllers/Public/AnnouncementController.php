@@ -7,6 +7,7 @@ use App\Models\Announcement;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -31,6 +32,13 @@ class AnnouncementController extends Controller
             ->with(['author:id,name', 'department:id,name'])
             ->active()
             ->visibleTo($user)
+            ->addSelect([
+                'user_acknowledgement' => DB::table('announcement_reads')
+                    ->select('acknowledgement')
+                    ->whereColumn('announcement_reads.announcement_id', 'announcements.id')
+                    ->where('announcement_reads.user_id', $user->id)
+                    ->limit(1),
+            ])
             ->withExists([
                 'readers as is_read' => fn (Builder $builder) => $builder->where('users.id', $user->id),
             ]);
@@ -139,6 +147,8 @@ class AnnouncementController extends Controller
 
         $announcement->load(['author:id,name', 'department:id,name']);
         $announcement->markReadFor($user);
+        $receipt = $announcement->receiptFor($user);
+        $acknowledgementSummary = $this->buildAcknowledgementSummary($announcement);
 
         $relatedAnnouncements = Announcement::query()
             ->with(['author:id,name', 'department:id,name'])
@@ -151,6 +161,8 @@ class AnnouncementController extends Controller
 
         return view('announcements.show', [
             'announcement' => $announcement,
+            'receipt' => $receipt,
+            'acknowledgementSummary' => $acknowledgementSummary,
             'relatedAnnouncements' => $relatedAnnouncements,
         ]);
     }
@@ -184,6 +196,20 @@ class AnnouncementController extends Controller
         $user->readAnnouncements()->syncWithoutDetaching($pivotData);
 
         return back();
+    }
+
+    public function acknowledge(Request $request, Announcement $announcement): RedirectResponse
+    {
+        $user = $request->user();
+        $this->abortUnlessVisible($announcement, $user);
+
+        $data = $request->validate([
+            'acknowledgement' => ['required', 'in:' . implode(',', Announcement::acknowledgementOptions())],
+        ]);
+
+        $announcement->acknowledgeFor($user, $data['acknowledgement']);
+
+        return back()->with('status', 'Acknowledgement saved.');
     }
 
     protected function applySort(Builder $query, string $sort, int $userId): void
@@ -246,6 +272,29 @@ class AnnouncementController extends Controller
             'unread' => $unread,
             'high_priority' => $highPriority,
             'my_department' => $myDepartment,
+        ];
+    }
+
+    protected function buildAcknowledgementSummary(Announcement $announcement): array
+    {
+        $rows = DB::table('announcement_reads')
+            ->select('acknowledgement', DB::raw('count(*) as total'))
+            ->where('announcement_id', $announcement->id)
+            ->groupBy('acknowledgement')
+            ->pluck('total', 'acknowledgement');
+
+        $read = (int) DB::table('announcement_reads')
+            ->where('announcement_id', $announcement->id)
+            ->count();
+
+        $understood = (int) ($rows[Announcement::ACKNOWLEDGEMENT_UNDERSTOOD] ?? 0);
+        $needsClarification = (int) ($rows[Announcement::ACKNOWLEDGEMENT_NEEDS_CLARIFICATION] ?? 0);
+
+        return [
+            'read' => $read,
+            'understood' => $understood,
+            'needs_clarification' => $needsClarification,
+            'read_only' => max($read - $understood - $needsClarification, 0),
         ];
     }
 

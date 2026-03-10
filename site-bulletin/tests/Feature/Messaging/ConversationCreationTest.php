@@ -3,6 +3,8 @@
 namespace Tests\Feature\Messaging;
 
 use App\Models\Conversation;
+use App\Models\Department;
+use App\Models\ManagerRelationship;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,7 +60,7 @@ class ConversationCreationTest extends TestCase
     {
         $employee = User::factory()->create(['role' => 'employee']);
         $other = User::factory()->create();
-        $department = \App\Models\Department::factory()->create();
+        $department = Department::factory()->create();
 
         $this->actingAs($employee)
             ->post(route('messages.store'), [
@@ -73,5 +75,75 @@ class ConversationCreationTest extends TestCase
         $this->assertNotNull($conversation);
         $this->assertSame('direct', $conversation->type);
         $this->assertTrue($conversation->participants()->where('users.id', $other->id)->exists());
+    }
+
+    public function test_employee_sees_routed_contact_shortcuts(): void
+    {
+        $supportDepartment = Department::factory()->create(['name' => 'Support']);
+        $employee = User::factory()->create(['role' => 'employee']);
+        $manager = User::factory()->manager()->create(['name' => 'Manager Pat']);
+        $supportManager = User::factory()->manager()->create(['name' => 'Support Sam']);
+        $hr = User::factory()->create(['role' => 'hr', 'name' => 'HR Helen']);
+
+        ManagerRelationship::create([
+            'manager_id' => $employee->id,
+            'reports_to_id' => $manager->id,
+            'relationship_type' => 'direct',
+        ]);
+
+        $supportDepartment->members()->attach($supportManager->id, ['role' => 'manager', 'is_primary' => true]);
+
+        $this->actingAs($employee)
+            ->get(route('messages.index'))
+            ->assertOk()
+            ->assertSeeText('Quick Contact')
+            ->assertSeeText('Message My Manager')
+            ->assertSeeText('Manager Pat')
+            ->assertSeeText('Ask Support')
+            ->assertSeeText('Support Sam')
+            ->assertSeeText('Escalate to HR')
+            ->assertSeeText('HR Helen');
+    }
+
+    public function test_my_manager_shortcut_reuses_existing_direct_conversation(): void
+    {
+        $employee = User::factory()->create(['role' => 'employee']);
+        $manager = User::factory()->manager()->create();
+
+        ManagerRelationship::create([
+            'manager_id' => $employee->id,
+            'reports_to_id' => $manager->id,
+            'relationship_type' => 'direct',
+        ]);
+
+        $conversation = Conversation::factory()
+            ->for($manager, 'creator')
+            ->create([
+                'subject' => 'Existing manager thread',
+                'type' => 'direct',
+            ]);
+
+        $conversation->participants()->sync([
+            $manager->id => ['role' => 'owner', 'last_read_at' => now()],
+            $employee->id => ['role' => 'member', 'last_read_at' => now()],
+        ]);
+
+        Message::factory()->for($conversation)->for($manager, 'sender')->create([
+            'body' => 'Initial manager note.',
+        ]);
+
+        $this->actingAs($employee)
+            ->post(route('messages.store'), [
+                'shortcut' => 'my_manager',
+                'body' => 'Need help on station 14.',
+            ])
+            ->assertRedirect(route('messages.show', $conversation));
+
+        $this->assertSame(1, Conversation::count());
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversation->id,
+            'sender_id' => $employee->id,
+            'body' => 'Need help on station 14.',
+        ]);
     }
 }

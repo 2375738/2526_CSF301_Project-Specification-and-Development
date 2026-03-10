@@ -26,8 +26,14 @@ class ReportTicketController extends Controller
 
         $user = $request->user();
         $categories = Category::orderBy('order')->get();
-        $title = old('title', $request->query('title'));
-        $categoryId = (int) old('category_id', $request->query('category_id'));
+        $presetKey = (string) $request->query('preset', old('preset', ''));
+        $quickPresets = $this->buildQuickPresets($categories);
+        $selectedPreset = $quickPresets->firstWhere('key', $presetKey);
+
+        $title = old('title', $request->query('title', $selectedPreset['title'] ?? null));
+        $description = old('description', $request->query('description', $selectedPreset['description_template'] ?? null));
+        $location = old('location', $request->query('location', $selectedPreset['location'] ?? null));
+        $categoryId = (int) old('category_id', $request->query('category_id', $selectedPreset['category_id'] ?? null));
 
         $similarTickets = $this->similarTickets(
             $user,
@@ -61,6 +67,12 @@ class ReportTicketController extends Controller
             'canActOnBehalf' => $canActOnBehalf,
             'employeeOptions' => $employeeOptions,
             'departmentOptions' => $departmentOptions,
+            'quickPresets' => $quickPresets,
+            'selectedPreset' => $selectedPreset,
+            'prefillTitle' => $title,
+            'prefillDescription' => $description,
+            'prefillLocation' => $location,
+            'prefillCategoryId' => $categoryId,
         ]);
     }
 
@@ -222,5 +234,70 @@ class ReportTicketController extends Controller
         });
 
         return $query->get();
+    }
+
+    protected function buildQuickPresets(Collection $categories): Collection
+    {
+        $categoryLookup = $categories->keyBy(fn (Category $category) => Str::lower($category->name));
+
+        $resolveCategoryId = function (array $names) use ($categoryLookup): ?int {
+            foreach ($names as $name) {
+                $category = $categoryLookup->get(Str::lower($name));
+                if ($category) {
+                    return $category->id;
+                }
+            }
+
+            return null;
+        };
+
+        return collect([
+            [
+                'key' => 'scanner',
+                'label' => 'Scanner issue',
+                'description' => 'Battery, login, pairing, or connection problem.',
+                'title' => 'Scanner issue at station',
+                'description_template' => 'Scanner problem observed. Device is not working as expected and is blocking task progress.',
+                'location' => 'Station / area',
+                'category_id' => $resolveCategoryId(['IT Support', 'Operations']),
+            ],
+            [
+                'key' => 'safety',
+                'label' => 'Safety concern',
+                'description' => 'Hazard, spill, blocked path, or damaged equipment.',
+                'title' => 'Safety concern in work area',
+                'description_template' => 'Safety concern observed. Immediate risk and impact need review.',
+                'location' => 'Affected area',
+                'category_id' => $resolveCategoryId(['Safety', 'Operations']),
+            ],
+            [
+                'key' => 'facilities',
+                'label' => 'Facilities issue',
+                'description' => 'Door, lighting, printer, workstation, or canteen issue.',
+                'title' => 'Facilities issue affecting work area',
+                'description_template' => 'Facilities issue observed. The problem is affecting normal work or access.',
+                'location' => 'Affected area',
+                'category_id' => $resolveCategoryId(['Facilities', 'Operations']),
+            ],
+            [
+                'key' => 'transport',
+                'label' => 'Transport problem',
+                'description' => 'Bus, shuttle, parking, or route disruption.',
+                'title' => 'Transport problem for shift travel',
+                'description_template' => 'Transport issue observed. Include route, stop, and impact on arrival or departure.',
+                'location' => 'Bus stop / route',
+                'category_id' => $resolveCategoryId(['Transport']),
+            ],
+        ])->map(function (array $preset): array {
+            return [
+                'key' => $preset['key'],
+                'label' => $preset['label'],
+                'description' => $preset['description'],
+                'title' => $preset['title'],
+                'description_template' => $preset['description_template'],
+                'location' => $preset['location'],
+                'category_id' => $preset['category_id'],
+            ];
+        })->filter(fn (array $preset) => $preset['category_id'] !== null)->values();
     }
 }

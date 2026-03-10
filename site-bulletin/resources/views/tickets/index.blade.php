@@ -3,10 +3,30 @@
 @section('content')
   <div class="space-y-6">
     <div class="bg-white shadow-sm rounded-xl px-6 py-5">
-      <h1 class="text-xl font-semibold text-slate-900">My Tickets</h1>
-      <p class="mt-1 text-sm text-slate-600">
-        Track open issues, see status updates, and share more details with the site team.
-      </p>
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-900">My Tickets</h1>
+          <p class="mt-1 text-sm text-slate-600">
+            Track open issues, see status updates, and share more details with the site team.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          @if (auth()->user()->hasRole('ops_manager', 'hr', 'admin'))
+            <a
+              href="{{ route('tickets.triage') }}"
+              class="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Open triage board
+            </a>
+          @endif
+          <a
+            href="{{ route('tickets.create') }}"
+            class="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+          >
+            Report issue
+          </a>
+        </div>
+      </div>
     </div>
 
     <form method="GET" action="{{ route('tickets.index') }}" class="bg-white shadow-sm rounded-xl px-6 py-4 flex flex-wrap items-center gap-3">
@@ -37,14 +57,36 @@
         </label>
       @endif
 
+      @if (isset($categoryFilterOptions) && $categoryFilterOptions->isNotEmpty())
+        <label class="text-sm text-slate-600">
+          <span class="sr-only">Ticket type</span>
+          <select name="category_id" class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+            <option value="">All ticket types</option>
+            @foreach ($categoryFilterOptions as $id => $name)
+              <option value="{{ $id }}" @selected((string) ($filters['category_id'] ?? '') === (string) $id)>{{ $name }}</option>
+            @endforeach
+          </select>
+        </label>
+      @endif
+
+      <label class="text-sm text-slate-600">
+        <span class="sr-only">From date</span>
+        <input type="date" name="from_date" value="{{ $filters['from_date'] ?? '' }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" />
+      </label>
+
+      <label class="text-sm text-slate-600">
+        <span class="sr-only">To date</span>
+        <input type="date" name="to_date" value="{{ $filters['to_date'] ?? '' }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" />
+      </label>
+
       @if (auth()->user()->isManager() || auth()->user()->isHr())
         <label class="inline-flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" name="mine" value="1" @checked(($filters['mine'] ?? false)) class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
           Assigned to me
         </label>
         <label class="inline-flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" name="overdue" value="1" @checked(($filters['overdue'] ?? false)) class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-          SLA overdue
+          <input type="checkbox" name="breached" value="1" @checked(($filters['breached'] ?? false) || ($filters['overdue'] ?? false)) class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+          SLA breached only
         </label>
       @endif
 

@@ -2,6 +2,17 @@
 
 @section('content')
   <div class="max-w-3xl mx-auto space-y-6">
+    <div class="flex items-center justify-between">
+      <a href="{{ route('tickets.index') }}" class="text-sm font-medium text-blue-600 hover:underline">
+        Back to tasks
+      </a>
+      @if ($selectedPreset)
+        <a href="{{ route('tickets.create') }}" class="text-sm font-medium text-slate-600 hover:text-slate-900">
+          Clear fast preset
+        </a>
+      @endif
+    </div>
+
     <div class="bg-white shadow-sm rounded-xl px-6 py-5">
       <h1 class="text-xl font-semibold text-slate-900">Report an Issue</h1>
       <p class="mt-2 text-sm text-slate-600">
@@ -9,8 +20,36 @@
       </p>
     </div>
 
+    @if (($quickPresets ?? collect())->isNotEmpty())
+      <div class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-4">
+        <div>
+          <h2 class="text-base font-semibold text-slate-900">Fast Report</h2>
+          <p class="mt-1 text-sm text-slate-600">Choose a common issue type to preload the form and reduce typing on the floor.</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          @foreach ($quickPresets as $preset)
+            <a
+              href="{{ route('tickets.create', ['preset' => $preset['key']]) }}"
+              class="rounded-2xl border px-4 py-4 transition {{ ($selectedPreset['key'] ?? null) === $preset['key'] ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-blue-50' }}"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-slate-900">{{ $preset['label'] }}</h3>
+                @if (($selectedPreset['key'] ?? null) === $preset['key'])
+                  <span class="inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">Selected</span>
+                @endif
+              </div>
+              <p class="mt-2 text-sm text-slate-600">{{ $preset['description'] }}</p>
+            </a>
+          @endforeach
+        </div>
+      </div>
+    @endif
+
     <form action="{{ route('tickets.store') }}" method="POST" enctype="multipart/form-data" class="bg-white shadow-sm rounded-xl px-6 py-6 space-y-5">
       @csrf
+      @if ($selectedPreset)
+        <input type="hidden" name="preset" value="{{ $selectedPreset['key'] }}">
+      @endif
 
       @if ($canActOnBehalf)
         <div class="grid gap-4 md:grid-cols-2">
@@ -49,7 +88,7 @@
           <select name="category_id" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" required>
             <option value="">Select category...</option>
             @foreach ($categories as $category)
-              <option value="{{ $category->id }}" @selected(old('category_id') == $category->id)>
+              <option value="{{ $category->id }}" @selected(($prefillCategoryId ?? old('category_id')) == $category->id)>
                 {{ $category->name }} @if ($category->is_sensitive) (HR Restricted) @endif
               </option>
             @endforeach
@@ -58,19 +97,29 @@
 
         <label class="block text-sm font-medium text-slate-700">
           Location (optional)
-          <input type="text" name="location" value="{{ old('location') }}" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="e.g. Inbound Dock A3" />
+          <input type="text" name="location" value="{{ $prefillLocation ?? old('location') }}" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="{{ $selectedPreset['location'] ?? 'e.g. Inbound Dock A3' }}" />
         </label>
       </div>
 
       <label class="block text-sm font-medium text-slate-700">
         Title
-        <input type="text" name="title" value="{{ old('title') }}" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Short summary" required />
+        <input type="text" name="title" value="{{ $prefillTitle ?? old('title') }}" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Short summary" required />
       </label>
 
       <label class="block text-sm font-medium text-slate-700">
         Description
-        <textarea name="description" rows="5" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Explain what happened, the impact, and any immediate actions taken." required>{{ old('description') }}</textarea>
+        <textarea name="description" rows="5" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Explain what happened, the impact, and any immediate actions taken." required>{{ $prefillDescription ?? old('description') }}</textarea>
+        @if ($selectedPreset)
+          <span class="mt-1 block text-xs text-slate-500">Fast report loaded. Edit the starter text if you need more detail.</span>
+        @endif
       </label>
+
+      @if ($selectedPreset)
+        <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <p class="font-semibold">{{ $selectedPreset['label'] }} preset active</p>
+          <p class="mt-1">Keep the prefilled structure if you are in a hurry, or expand it with exact device, area, and impact details.</p>
+        </div>
+      @endif
 
       <label class="block text-sm font-medium text-slate-700">
         Attachment (optional)

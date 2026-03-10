@@ -12,7 +12,7 @@ Supporting data retained for Laravel seeders:
 - `site-bulletin/**`
 - `Site Bulletin Implementation Guide/**`
 - `data/**` only when referenced by app seeders or runtime.
-- Root documentation that governs work execution (`README.md`, `AGENTS.md`, `CLEANUP_LOG.md`).
+- Root documentation that governs work execution (`README.md`, `AGENTS.md`, `CLEANUP_LOG.md`, `IMPLEMENTATION_LOG.md`).
 
 ## What To Avoid Re-Adding
 - Duplicate prototype bundles unrelated to the target app.
@@ -30,6 +30,7 @@ Supporting data retained for Laravel seeders:
 - Treat `Site Bulletin Implementation Guide/` as the feature/UX reference.
 - Before adding new files at repo root, justify why they are needed for run/build/test/compare.
 - Keep changes traceable in `CLEANUP_LOG.md` or a dedicated implementation log.
+- Log every UI/UX change in `IMPLEMENTATION_LOG.md` with: date, scope, reason, and validation evidence (test command or manual check).
 
 ## Git Update Cadence
 - Push meaningful progress to GitHub at least once every 7 days, even during active development.

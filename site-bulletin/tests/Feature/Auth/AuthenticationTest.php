@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,6 +16,28 @@ class AuthenticationTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertStatus(200);
+    }
+
+    public function test_login_screen_shows_demo_preset_buttons_when_demo_users_exist(): void
+    {
+        $department = Department::factory()->create(['name' => 'Inbound']);
+
+        User::factory()->create([
+            'name' => 'John Doe',
+            'role' => 'employee',
+            'primary_department_id' => $department->id,
+        ]);
+
+        User::factory()->manager()->create([
+            'name' => 'Operations Manager',
+            'primary_department_id' => $department->id,
+        ]);
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Quick Demo Access')
+            ->assertSee('Enter as Employee')
+            ->assertSee('Enter as Manager');
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void

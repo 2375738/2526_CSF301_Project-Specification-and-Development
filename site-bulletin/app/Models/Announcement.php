@@ -8,11 +8,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class Announcement extends Model
 {
     /** @use HasFactory<\Database\Factories\AnnouncementFactory> */
     use HasFactory;
+
+    public const ACKNOWLEDGEMENT_UNDERSTOOD = 'understood';
+    public const ACKNOWLEDGEMENT_NEEDS_CLARIFICATION = 'needs_clarification';
 
     protected $fillable = [
         'title',
@@ -56,7 +60,7 @@ class Announcement extends Model
     public function readers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'announcement_reads')
-            ->withPivot(['read_at'])
+            ->withPivot(['read_at', 'acknowledgement', 'acknowledged_at'])
             ->withTimestamps();
     }
 
@@ -104,17 +108,49 @@ class Announcement extends Model
 
     public function markReadFor(User $user): void
     {
+        $this->syncReceiptFor($user, [
+            'read_at' => now(),
+        ]);
+    }
+
+    public function acknowledgeFor(User $user, string $acknowledgement): void
+    {
+        $this->syncReceiptFor($user, [
+            'read_at' => now(),
+            'acknowledgement' => $acknowledgement,
+            'acknowledged_at' => now(),
+        ]);
+    }
+
+    public function receiptFor(User $user): ?object
+    {
+        return DB::table('announcement_reads')
+            ->where('announcement_id', $this->id)
+            ->where('user_id', $user->id)
+            ->first(['read_at', 'acknowledgement', 'acknowledged_at']);
+    }
+
+    public static function acknowledgementOptions(): array
+    {
+        return [
+            self::ACKNOWLEDGEMENT_UNDERSTOOD,
+            self::ACKNOWLEDGEMENT_NEEDS_CLARIFICATION,
+        ];
+    }
+
+    protected function syncReceiptFor(User $user, array $attributes): void
+    {
         $existing = $this->readers()
             ->where('users.id', $user->id)
             ->exists();
 
         if ($existing) {
-            $this->readers()->updateExistingPivot($user->id, ['read_at' => now()]);
+            $this->readers()->updateExistingPivot($user->id, $attributes);
             return;
         }
 
         $this->readers()->syncWithoutDetaching([
-            $user->id => ['read_at' => now()],
+            $user->id => $attributes,
         ]);
     }
 }

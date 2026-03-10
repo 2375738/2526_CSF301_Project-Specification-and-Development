@@ -32,6 +32,60 @@ class AnnouncementReadFlowTest extends TestCase
         ]);
     }
 
+    public function test_user_can_acknowledge_announcement_as_understood(): void
+    {
+        $user = User::factory()->create();
+        $announcement = Announcement::factory()->create([
+            'audience' => 'all',
+            'is_active' => true,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addDay(),
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('announcements.acknowledge', $announcement), [
+                'acknowledgement' => 'understood',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('announcement_reads', [
+            'announcement_id' => $announcement->id,
+            'user_id' => $user->id,
+            'acknowledgement' => 'understood',
+        ]);
+    }
+
+    public function test_manager_sees_acknowledgement_summary_on_announcement_detail(): void
+    {
+        $manager = User::factory()->manager()->create();
+        $readerA = User::factory()->create();
+        $readerB = User::factory()->create();
+        $readerC = User::factory()->create();
+
+        $announcement = Announcement::factory()->create([
+            'audience' => 'all',
+            'is_active' => true,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addDay(),
+            'author_id' => $manager->id,
+        ]);
+
+        $announcement->readers()->syncWithoutDetaching([
+            $readerA->id => ['read_at' => now(), 'acknowledgement' => 'understood', 'acknowledged_at' => now()],
+            $readerB->id => ['read_at' => now(), 'acknowledgement' => 'needs_clarification', 'acknowledged_at' => now()],
+            $readerC->id => ['read_at' => now()],
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('announcements.show', $announcement))
+            ->assertOk()
+            ->assertSeeText('Acknowledgement Summary')
+            ->assertSeeText('Understood')
+            ->assertSeeText('Need Clarification')
+            ->assertSeeText('Read Only')
+            ->assertSeeText('4');
+    }
+
     public function test_user_cannot_open_department_announcement_for_other_department(): void
     {
         $userDepartment = Department::factory()->create();
@@ -54,4 +108,3 @@ class AnnouncementReadFlowTest extends TestCase
             ->assertNotFound();
     }
 }
-

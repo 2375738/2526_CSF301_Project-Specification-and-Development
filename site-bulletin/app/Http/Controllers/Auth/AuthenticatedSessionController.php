@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -20,12 +21,39 @@ class AuthenticatedSessionController extends Controller
     public function create(): View
     {
         $demoLoginEnabled = $this->demoLoginEnabled();
+        $departments = collect();
+        $demoPresets = collect();
+
+        if ($demoLoginEnabled) {
+            $preferredSlugs = [
+                'customer-returns',
+                'kariba',
+                'inbound',
+                'icqa',
+                'outbound',
+                'support',
+                'tom',
+            ];
+
+            $departments = Department::query()
+                ->whereIn('slug', $preferredSlugs)
+                ->get(['id', 'name', 'slug'])
+                ->sortBy(function ($department) use ($preferredSlugs) {
+                    return array_search($department->slug, $preferredSlugs, true);
+                })
+                ->values();
+
+            if ($departments->isEmpty()) {
+                $departments = Department::query()->orderBy('name')->get(['id', 'name']);
+            }
+
+            $demoPresets = $this->buildDemoPresets($departments);
+        }
 
         return view('auth.login', [
             'demoLoginEnabled' => $demoLoginEnabled,
-            'departments' => $demoLoginEnabled
-                ? Department::query()->orderBy('name')->get(['id', 'name'])
-                : collect(),
+            'departments' => $departments,
+            'demoPresets' => $demoPresets,
         ]);
     }
 
@@ -96,5 +124,42 @@ class AuthenticatedSessionController extends Controller
     protected function demoLoginEnabled(): bool
     {
         return app()->environment(['local', 'testing']) || (bool) config('app.debug');
+    }
+
+    protected function buildDemoPresets(Collection $departments): Collection
+    {
+        $departmentIds = $departments->pluck('id')->filter()->values();
+
+        return collect([
+            'employee' => 'Employee',
+            'manager' => 'Manager',
+        ])->map(function (string $label, string $role) use ($departmentIds) {
+            $user = User::query()
+                ->with('primaryDepartment:id,name')
+                ->where('role', $role)
+                ->when(
+                    $departmentIds->isNotEmpty(),
+                    fn ($query) => $query->whereIn('primary_department_id', $departmentIds)
+                )
+                ->orderBy('id')
+                ->first()
+                ?? User::query()
+                    ->with('primaryDepartment:id,name')
+                    ->where('role', $role)
+                    ->orderBy('id')
+                    ->first();
+
+            if (! $user) {
+                return null;
+            }
+
+            return [
+                'role' => $role,
+                'label' => $label,
+                'name' => $user->name,
+                'department_id' => $user->primary_department_id,
+                'department_name' => $user->primaryDepartment?->name,
+            ];
+        })->filter()->values();
     }
 }

@@ -7,13 +7,14 @@
   <style>[x-cloak] { display: none !important; }</style>
   @vite(['resources/css/app.css','resources/js/app.js'])
 </head>
-<body class="bg-slate-50 text-gray-900">
+<body class="cwl1-bg cwl1-noise text-gray-900">
   @php
     $showGovernance = auth()->check() && auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin');
     $desktopNavItems = [
       ['label' => 'Dashboard', 'route' => route('home'), 'active' => request()->routeIs('home', 'dashboard')],
       ['label' => 'Announcements', 'route' => route('announcements.index'), 'active' => request()->routeIs('announcements.*')],
       ['label' => 'Messages', 'route' => route('messages.index'), 'active' => request()->routeIs('messages.*')],
+      ['label' => 'Knowledge', 'route' => route('knowledge.index'), 'active' => request()->routeIs('knowledge.*')],
       ['label' => 'Tasks', 'route' => route('tickets.index'), 'active' => request()->routeIs('tickets.*')],
       ['label' => 'Profile', 'route' => route('profile.edit'), 'active' => request()->routeIs('profile.*')],
     ];
@@ -26,6 +27,7 @@
       ['label' => 'Dashboard', 'route' => route('home'), 'active' => request()->routeIs('home', 'dashboard')],
       ['label' => 'Announcements', 'route' => route('announcements.index'), 'active' => request()->routeIs('announcements.*')],
       ['label' => 'Messages', 'route' => route('messages.index'), 'active' => request()->routeIs('messages.*')],
+      ['label' => 'Knowledge', 'route' => route('knowledge.index'), 'active' => request()->routeIs('knowledge.*')],
       ['label' => 'Tasks', 'route' => route('tickets.index'), 'active' => request()->routeIs('tickets.*')],
       ['label' => 'Profile', 'route' => route('profile.edit'), 'active' => request()->routeIs('profile.*')],
     ];
@@ -47,7 +49,7 @@
       >
         <div class="border-b border-slate-200 px-4 py-4">
           <a href="{{ route('home') }}" class="flex items-center gap-3">
-            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white font-semibold">SB</span>
+            <img src="{{ asset('images/cwl1-logo.jpeg') }}" alt="CWL1 logo" class="h-10 w-10 rounded-xl object-cover" />
             <div x-show="!sidebarCollapsed" x-cloak>
               <p class="text-base font-semibold text-slate-900">Site Bulletin</p>
               <p class="text-xs text-slate-500">Operations Portal</p>
@@ -94,12 +96,25 @@
     @endauth
 
     <div class="flex min-h-screen flex-1 flex-col">
-      <header class="bg-white shadow-sm">
+      <header @class([
+        'bg-white/90 shadow-sm backdrop-blur',
+        'sticky top-0 z-50' => auth()->guest(),
+      ])>
         <div class="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4">
-          <a href="{{ route('home') }}" class="text-lg font-semibold text-slate-800 lg:hidden">Site Bulletin</a>
-          <div class="hidden lg:block">
-            <p class="text-sm text-slate-500">Operations Portal</p>
-          </div>
+          @guest
+            <a href="{{ route('home') }}" class="inline-flex items-center gap-2 text-lg font-semibold text-slate-800">
+              <img src="{{ asset('images/cwl1-logo.jpeg') }}" alt="CWL1 logo" class="h-8 w-8 rounded-lg object-cover" />
+              <span>Site Bulletin</span>
+            </a>
+          @else
+            <a href="{{ route('home') }}" class="inline-flex items-center gap-2 text-lg font-semibold text-slate-800 lg:hidden">
+              <img src="{{ asset('images/cwl1-logo.jpeg') }}" alt="CWL1 logo" class="h-8 w-8 rounded-lg object-cover" />
+              <span>Site Bulletin</span>
+            </a>
+            <div class="hidden lg:block">
+              <p class="text-sm text-slate-500">Operations Portal</p>
+            </div>
+          @endguest
           <nav class="flex items-center gap-4 text-sm font-medium">
             @auth
               <div class="relative inline-block">
@@ -110,9 +125,9 @@
                 <button type="submit" class="text-slate-600 hover:text-slate-900">Logout</button>
               </form>
             @else
-              <a href="{{ route('login') }}" class="text-slate-600 hover:text-slate-900">Log in</a>
+              <a href="{{ route('login') }}" class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-white hover:bg-slate-700">Log in</a>
               @if (Route::has('register'))
-                <a href="{{ route('register') }}" class="text-slate-600 hover:text-slate-900">Register</a>
+                <a href="{{ route('register') }}" class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-100">Register</a>
               @endif
             @endauth
           </nav>
@@ -131,7 +146,7 @@
         </div>
       </main>
 
-      <footer class="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+      <footer class="border-t border-slate-200 bg-white/90 py-4 text-center text-xs text-slate-500 backdrop-blur">
         &copy; {{ now()->year }} Site Bulletin. Coursework prototype.
       </footer>
     </div>

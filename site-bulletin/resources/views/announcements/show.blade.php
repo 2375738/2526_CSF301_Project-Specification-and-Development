@@ -9,6 +9,11 @@
           'low' => 'bg-slate-100 text-slate-700',
       ];
       $priority = $announcement->priority ?? 'medium';
+      $acknowledgementLabels = [
+          'understood' => 'Understood',
+          'needs_clarification' => 'Needs clarification',
+      ];
+      $currentAcknowledgement = $receipt->acknowledgement ?? null;
   @endphp
 
   <div class="space-y-6">
@@ -50,6 +55,85 @@
       </div>
     </article>
 
+    <section class="rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">Acknowledge This Update</h2>
+          <p class="mt-1 text-sm text-slate-600">Record whether this update is clear or whether you need follow-up.</p>
+        </div>
+        <div class="text-sm text-slate-600">
+          <p>Read state: <span class="font-semibold text-slate-800">{{ $receipt?->read_at ? 'Read' : 'Unread' }}</span></p>
+          <p>
+            Current acknowledgement:
+            <span class="font-semibold text-slate-800">{{ $acknowledgementLabels[$currentAcknowledgement] ?? 'Read only' }}</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-4 flex flex-wrap gap-3">
+        <form method="POST" action="{{ route('announcements.acknowledge', $announcement) }}">
+          @csrf
+          @method('PATCH')
+          <input type="hidden" name="acknowledgement" value="understood">
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold {{ $currentAcknowledgement === 'understood' ? 'bg-emerald-600 text-white' : 'border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50' }}"
+          >
+            Understood
+          </button>
+        </form>
+
+        <form method="POST" action="{{ route('announcements.acknowledge', $announcement) }}">
+          @csrf
+          @method('PATCH')
+          <input type="hidden" name="acknowledgement" value="needs_clarification">
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold {{ $currentAcknowledgement === 'needs_clarification' ? 'bg-amber-600 text-white' : 'border border-amber-300 bg-white text-amber-700 hover:bg-amber-50' }}"
+          >
+            Need Clarification
+          </button>
+        </form>
+      </div>
+
+      <p class="mt-3 text-xs text-slate-500">
+        This keeps the update marked as read and helps managers see whether the message landed cleanly.
+      </p>
+
+      @if ($currentAcknowledgement === 'needs_clarification')
+        <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p class="font-semibold">Clarification requested</p>
+          <p class="mt-1">
+            If you still need help after acknowledging this update, use <a href="{{ route('messages.index') }}" class="font-semibold underline">Messages</a> to contact your manager or support.
+          </p>
+        </div>
+      @endif
+    </section>
+
+    @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
+      <section class="rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        <h2 class="text-lg font-semibold text-slate-900">Acknowledgement Summary</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-4">
+          <div class="rounded-lg border border-slate-200 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Read</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ $acknowledgementSummary['read'] }}</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Understood</p>
+            <p class="mt-1 text-2xl font-semibold text-emerald-700">{{ $acknowledgementSummary['understood'] }}</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Need Clarification</p>
+            <p class="mt-1 text-2xl font-semibold text-amber-700">{{ $acknowledgementSummary['needs_clarification'] }}</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 px-4 py-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Read Only</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ $acknowledgementSummary['read_only'] }}</p>
+          </div>
+        </div>
+      </section>
+    @endif
+
     @if ($relatedAnnouncements->isNotEmpty())
       <section class="rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
         <h2 class="text-lg font-semibold text-slate-900">Related Updates</h2>
@@ -69,4 +153,3 @@
     @endif
   </div>
 @endsection
-

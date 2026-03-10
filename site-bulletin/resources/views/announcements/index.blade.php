@@ -8,6 +8,14 @@
           'medium' => 'bg-blue-100 text-blue-700',
           'low' => 'bg-slate-100 text-slate-700',
       ];
+      $acknowledgementLabels = [
+          'understood' => 'Understood',
+          'needs_clarification' => 'Needs Clarification',
+      ];
+      $acknowledgementClasses = [
+          'understood' => 'bg-emerald-100 text-emerald-700',
+          'needs_clarification' => 'bg-amber-100 text-amber-700',
+      ];
   @endphp
 
   <div class="space-y-6" x-data="{ showComposer: {{ $errors->any() ? 'true' : 'false' }} }" @keydown.escape.window="showComposer = false">
@@ -191,6 +199,7 @@
         @php
             $isRead = (bool) ($announcement->is_read ?? false);
             $priority = $announcement->priority ?? 'medium';
+            $acknowledgement = $announcement->user_acknowledgement ?? null;
         @endphp
         <article class="rounded-xl border px-5 py-4 shadow-sm {{ $isRead ? 'border-slate-200 bg-white' : 'border-blue-200 bg-blue-50' }}">
           <div class="flex flex-wrap items-center justify-between gap-2">
@@ -233,6 +242,11 @@
                   Unread
                 </span>
               @endunless
+              @if ($acknowledgement)
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {{ $acknowledgementClasses[$acknowledgement] ?? 'bg-slate-100 text-slate-700' }}">
+                  {{ $acknowledgementLabels[$acknowledgement] ?? ucfirst(str_replace('_', ' ', $acknowledgement)) }}
+                </span>
+              @endif
               <a href="{{ route('announcements.show', $announcement) }}" class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-700 hover:bg-slate-50">
                 Open
               </a>

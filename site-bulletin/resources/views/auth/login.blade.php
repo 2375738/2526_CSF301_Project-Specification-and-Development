@@ -3,6 +3,39 @@
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
     <div class="space-y-6">
+        @if (($demoLoginEnabled ?? false) && ($demoPresets ?? collect())->isNotEmpty())
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                <div class="space-y-1">
+                    <h2 class="text-base font-semibold text-slate-900">Quick Demo Access</h2>
+                    <p class="text-sm text-slate-600">
+                        Enter with a seeded account first, or use the custom selector below for department-specific checks.
+                    </p>
+                </div>
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    @foreach ($demoPresets as $preset)
+                        <form method="POST" action="{{ route('demo.login') }}">
+                            @csrf
+                            <input type="hidden" name="role" value="{{ $preset['role'] }}">
+                            @if (!empty($preset['department_id']))
+                                <input type="hidden" name="department_id" value="{{ $preset['department_id'] }}">
+                            @endif
+                            <button
+                                type="submit"
+                                class="flex min-h-[88px] w-full flex-col items-start justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
+                            >
+                                <span class="text-sm font-semibold text-slate-900">Enter as {{ $preset['label'] }}</span>
+                                <span class="mt-1 text-sm text-slate-600">{{ $preset['name'] }}</span>
+                                <span class="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">
+                                    {{ $preset['department_name'] ?? 'Any Department' }}
+                                </span>
+                            </button>
+                        </form>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('login') }}">
             @csrf
 
@@ -48,7 +81,7 @@
 
         @if (($demoLoginEnabled ?? false) && ($departments ?? collect())->isNotEmpty())
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <h2 class="text-sm font-semibold text-slate-900">Quick Demo Access</h2>
+                <h2 class="text-sm font-semibold text-slate-900">Custom Demo Role</h2>
                 <p class="mt-1 text-xs text-slate-600">
                     Select role and department to enter the app without manual credentials.
                 </p>
