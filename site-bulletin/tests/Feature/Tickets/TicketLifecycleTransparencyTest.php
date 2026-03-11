@@ -34,10 +34,15 @@ class TicketLifecycleTransparencyTest extends TestCase
             'category_id' => $category->id,
             'requester_id' => $requester->id,
             'assignee_id' => $manager->id,
+            'template_key' => 'scanner_issue',
             'priority' => TicketPriority::High,
             'status' => TicketStatus::WaitingEmployee,
             'title' => 'Scanner battery swap needed',
             'description' => 'Scanner 14 is dropping connection after 10 minutes.',
+            'details_json' => [
+                ['label' => 'Asset tag or scanner ID', 'value' => 'SCN-14'],
+                ['label' => 'Whether work is fully blocked', 'value' => 'Yes, active work is blocked'],
+            ],
             'sla_resolution_breached' => true,
         ]);
 
@@ -72,6 +77,11 @@ class TicketLifecycleTransparencyTest extends TestCase
             ->assertSeeText('Waiting on you')
             ->assertSeeText('What happens next')
             ->assertSeeText('Add the missing detail or confirm the next step so work can continue.')
+            ->assertSeeText('Template:')
+            ->assertSeeText('Scanner issue')
+            ->assertSeeText('Structured Details')
+            ->assertSeeText('Asset tag or scanner ID')
+            ->assertSeeText('SCN-14')
             ->assertSeeText('Latest visible update')
             ->assertSeeText('Service note')
             ->assertSeeText('This ticket has missed a service target and should be treated as urgent.')

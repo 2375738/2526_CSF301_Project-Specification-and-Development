@@ -21,11 +21,13 @@ class Ticket extends Model
         'category_id',
         'created_for_id',
         'department_id',
+        'template_key',
         'duplicate_of_id',
         'priority',
         'status',
         'title',
         'description',
+        'details_json',
         'location',
         'closed_at',
         'sla_first_response_breached',
@@ -37,6 +39,7 @@ class Ticket extends Model
     protected $casts = [
         'priority' => TicketPriority::class,
         'status' => TicketStatus::class,
+        'details_json' => 'array',
         'closed_at' => 'datetime',
         'sla_first_response_breached' => 'boolean',
         'sla_resolution_breached' => 'boolean',
@@ -92,6 +95,11 @@ class Ticket extends Model
     public function statusChanges(): HasMany
     {
         return $this->hasMany(TicketStatusChange::class)->orderBy('created_at');
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(TicketApproval::class)->orderBy('created_at');
     }
 
     public function latestStatusChange(): HasOne

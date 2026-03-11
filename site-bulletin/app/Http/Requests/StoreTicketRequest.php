@@ -18,10 +18,13 @@ class StoreTicketRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'template' => ['nullable', 'string', 'max:100'],
             'category_id' => ['required', 'exists:categories,id'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
             'location' => ['nullable', 'string', 'max:255'],
+            'detail_answers' => ['nullable', 'array'],
+            'detail_answers.*' => ['nullable', 'string', 'max:500'],
             'created_for_id' => ['nullable', 'exists:users,id'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'attachment' => [

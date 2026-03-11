@@ -93,6 +93,519 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - routed communication shortcuts
   - manager/support operational queue views
 
+## Block: Product Spec
+- Date: 2026-03-10
+- Scope: Ticketing redesign assumptions for template-driven, role-aware operational workflows.
+- Context:
+  - Ticket creation should be fast and template-led, especially for floor employees using mobile devices during shift.
+  - Not all tickets should expose the same fields to all roles.
+  - Different resolver groups work different patterns:
+    - employees and managers may operate days or nights
+    - admin/support functions are mostly day-shift and often 5-of-7
+    - night HR support should be treated as limited-scope rather than full-service
+- Product decision:
+  - Move away from a single generic ticket form toward scenario templates with prefilled defaults, conditional fields, and role-based routing.
+
+## Block: Ticketing Use Cases
+- Date: 2026-03-10
+- Scope: Role-based scenarios that should define template design.
+- Employee-initiated scenarios:
+  - Equipment issue:
+    - scanner not working
+    - printer jam
+    - station screen frozen
+    - battery / charger missing
+  - Facility issue:
+    - damaged station
+    - broken chair / desk
+    - spill / hazard
+    - blocked walkway
+  - HR self-service request:
+    - missed punch
+    - clock-in / clock-out correction
+    - shift swap request
+    - attendance clarification
+  - Transport / access:
+    - shuttle missing
+    - parking problem
+    - badge / access issue
+  - Quality / process clarification:
+    - conflicting instruction
+    - missing SOP
+    - repeated defect pattern
+- Manager-initiated scenarios:
+  - on-behalf ticket for employee blocker
+  - repeated equipment issue affecting multiple associates
+  - department escalation for facilities / IT / transport
+  - attendance or clock adjustment approval routing
+  - shift swap endorsement
+  - investigation or incident escalation with internal notes
+- Admin / support / HR scenarios:
+  - queue triage and assignment
+  - request approval / rejection
+  - duplicate merge
+  - site-wide incident coordination
+  - internal-only note exchange
+  - audit-facing resolution evidence collection
+
+## Block: Template Catalogue
+- Date: 2026-03-10
+- Scope: Proposed first-pass ticket templates for the prototype.
+- Employee templates:
+  - `scanner_issue`
+    - category: IT Support / Operations
+    - default priority: medium
+    - key fields:
+      - station or area
+      - device asset tag
+      - issue type
+      - blocking work now? `yes/no`
+      - photo optional
+  - `station_equipment_fault`
+    - category: Facilities / Operations
+    - default priority: medium
+    - key fields:
+      - area
+      - equipment type
+      - safe to continue working? `yes/no`
+      - photo optional
+  - `safety_hazard`
+    - category: Safety / Facilities
+    - default priority: high
+    - key fields:
+      - location
+      - hazard type
+      - immediate danger? `yes/no`
+      - photo optional
+      - witness optional
+  - `missed_punch`
+    - category: HR
+    - default priority: low
+    - key fields:
+      - shift date
+      - expected start time
+      - expected end time
+      - clock event type `in/out/both`
+      - screenshot optional
+  - `shift_swap_request`
+    - category: HR
+    - default priority: low
+    - key fields:
+      - requester shift
+      - requested replacement date
+      - swap partner name or employee id
+      - manager informed? `yes/no`
+  - `transport_issue`
+    - category: Transport
+    - default priority: medium
+    - key fields:
+      - route
+      - stop
+      - travel direction
+      - service missing / late / full
+      - photo optional
+- Manager templates:
+  - `report_on_behalf`
+    - category: variable
+    - default priority: medium
+    - key fields:
+      - affected employee
+      - impact scope `single station / small area / department`
+      - manager summary
+      - attachments optional
+  - `department_blocker`
+    - category: Operations / Facilities / IT
+    - default priority: high
+    - key fields:
+      - department
+      - affected headcount
+      - work around available? `yes/no`
+      - estimated operational impact
+      - photo optional
+  - `attendance_adjustment_approval`
+    - category: HR
+    - default priority: low
+    - key fields:
+      - employee
+      - adjustment reason
+      - manager recommendation
+      - supporting screenshot optional
+  - `incident_escalation`
+    - category: Safety / Operations
+    - default priority: high
+    - key fields:
+      - incident summary
+      - who is affected
+      - containment action taken
+      - evidence attachments
+- Admin / support templates:
+  - `triage_assignment`
+    - internal workflow template for assignment / reassignment
+  - `resolver_follow_up`
+    - internal request for more information from requester or manager
+  - `approval_outcome`
+    - approve / reject / needs-more-info for HR-style requests
+  - `duplicate_merge`
+    - internal template to link duplicate tickets to a primary case
+
+## Block: Ticket Attributes
+- Date: 2026-03-10
+- Scope: Suggested field model by visibility and function.
+- Core attributes for all tickets:
+  - template key
+  - category
+  - requester
+  - created for
+  - department
+  - location / area
+  - priority
+  - status
+  - short title
+  - structured detail payload
+  - assigned team
+  - assignee
+  - due-by or target response window
+  - working-hours calendar key
+- Employee-visible attributes:
+  - title
+  - plain-language status
+  - next step
+  - expected responder group
+  - latest public update
+  - attachments they uploaded
+  - approval state if relevant
+  - ETA band `today / next shift / awaiting weekday team / more info needed`
+- Manager-visible attributes:
+  - all employee-visible fields
+  - employee impact
+  - affected shift
+  - on-behalf relationship
+  - department impact
+  - internal routing summary where appropriate
+- Support/admin-visible attributes:
+  - all operational fields
+  - private notes
+  - assignment history
+  - duplicate linkage
+  - approval audit trail
+  - hidden resolution notes
+  - SLA stop/start state
+  - shift-calendar adjusted due times
+- Hidden from employees by default:
+  - private comments
+  - reassignment rationale
+  - approval deliberation notes
+  - duplicate merge reasoning
+  - internal severity score
+  - resolver staffing notes
+
+## Block: Attachments And Evidence
+- Date: 2026-03-10
+- Scope: Attachment policy assumptions for prototype and future production hardening.
+- Required capability:
+  - keep general attachments on tickets
+  - classify evidence by type:
+    - photo
+    - screenshot
+    - document
+    - timesheet evidence
+    - manager-only note attachment
+- Recommended rules:
+  - employee templates should allow optional photo/screenshot upload where relevant
+  - HR-style templates should allow screenshot/document evidence
+  - safety and incident templates should strongly encourage evidence
+  - private/internal evidence should be markable as resolver-only
+- Future schema suggestion:
+  - extend `ticket_attachments` with:
+    - `visibility` (`public`, `internal`)
+    - `kind` (`photo`, `screenshot`, `document`, `other`)
+    - `label` or `description`
+
+## Block: Ticketing Process
+- Date: 2026-03-10
+- Scope: Proposed lifecycle and ownership model by ticket type.
+- Process model:
+  - Initiation:
+    - employee starts a template ticket directly
+    - manager starts on-behalf or escalation ticket
+    - admin/support can open internal workflow tickets
+  - Auto-routing:
+    - template selects default assigned team
+    - department and shift context influence queue
+    - some templates route first to manager approval before support queue
+  - Triage:
+    - support/admin/HR confirms template, priority, and owner
+    - duplicate check performed for repeated incidents
+  - Resolver action:
+    - resolver adds public update or internal note
+    - requester may be asked for more info
+  - Approval outcome:
+    - some templates require explicit approve/reject
+    - outcome becomes visible to requester in plain language
+  - Closure:
+    - close with public resolution summary
+    - keep internal notes private
+- Approval examples:
+  - `missed_punch`
+    - initiated by employee
+    - manager confirms if needed
+    - HR resolves
+  - `shift_swap_request`
+    - initiated by employee
+    - manager approves or rejects first
+    - HR finalizes if site policy requires HR involvement
+  - `scanner_issue`
+    - initiated by employee or manager
+    - no approval needed
+    - routes straight to support / operations
+  - `department_blocker`
+    - initiated by manager
+    - no approval needed
+    - immediate ops/support triage
+
+## Block: Shift-Aware SLA Assumptions
+- Date: 2026-03-10
+- Scope: Response expectations shaped by different working patterns.
+- Suggested service calendars:
+  - `24x7_ops`
+    - operations, safety, critical facilities, active shift blockers
+  - `site_days`
+    - standard admin/support functions
+    - mostly Monday-Friday daytime
+  - `limited_night_hr`
+    - basic HR night coverage for clock and attendance corrections only
+- Suggested response bands:
+  - active shift blocker:
+    - first response within `15-30 minutes`
+    - target resolution `same shift`
+  - safety hazard:
+    - immediate triage
+    - target containment `within 15 minutes`
+  - standard equipment fault:
+    - first response within `1 hour`
+    - resolution `same shift or next working shift`
+  - missed punch:
+    - first response `same working day`
+    - resolution `within 1-2 admin working days`
+  - shift swap:
+    - manager decision `within 1 working day`
+    - HR finalization `within 1-2 working days` if applicable
+- UX requirement:
+  - do not expose raw timestamps only
+  - show adjusted language such as:
+    - `Awaiting weekday HR team`
+    - `Queued for next day-shift support window`
+    - `Night shift coverage can only approve basic attendance fixes`
+
+## Block: Database Direction
+- Date: 2026-03-10
+- Scope: Storage recommendation for prototype vs future production use.
+- SQLite assessment:
+  - fine for coursework prototype, local development, and low-concurrency demo flows
+  - not ideal for heavier concurrent updates, queue workers, richer reporting, and attachment-heavy operational use
+- Recommendation:
+  - keep SQLite for fast prototype iteration right now
+  - design next schema changes so migration to PostgreSQL is easy
+- Preferred future target:
+  - PostgreSQL
+- Reason:
+  - better concurrency characteristics
+  - stronger indexing and reporting options
+  - better path for JSON template payloads, audit queries, and operational analytics
+- Do not optimize prematurely:
+  - no immediate DB switch is required unless prototype constraints start blocking development or testing
+
+## Block: Suggested Schema Changes
+- Date: 2026-03-10
+- Scope: Candidate migration work for a future ticket-template implementation pass.
+- Candidate new tables:
+  - `ticket_templates`
+    - `key`
+    - `name`
+    - `requester_role`
+    - `category_id`
+    - `default_priority`
+    - `assigned_team`
+    - `requires_manager_approval`
+    - `requires_hr_approval`
+    - `working_hours_calendar`
+    - `config_json`
+  - `ticket_approvals`
+    - `ticket_id`
+    - `step`
+    - `approver_id`
+    - `status`
+    - `decision_notes`
+    - `decided_at`
+- Candidate new columns on `tickets`:
+  - `template_key`
+  - `assigned_team`
+  - `public_status_label`
+  - `next_action_label`
+  - `target_starts_at`
+  - `target_resolves_at`
+  - `working_hours_calendar`
+  - `details_json`
+- Candidate new columns on `ticket_comments`:
+  - keep `is_private`
+  - optionally add `comment_type` (`public_update`, `internal_note`, `request_for_info`, `approval_note`)
+
+## Block: Recommended Delivery Order
+- Date: 2026-03-10
+- Scope: Suggested implementation sequence for the ticketing redesign.
+- Order:
+  - first:
+    - define template model and static config
+    - keep existing generic ticket flow as fallback
+  - second:
+    - implement employee templates:
+      - `scanner_issue`
+      - `safety_hazard`
+      - `missed_punch`
+      - `shift_swap_request`
+  - third:
+    - add approval model for attendance and shift-change requests
+  - fourth:
+    - add assigned-team and shift-aware ETA presentation on ticket detail
+  - fifth:
+    - add private/internal workflow actions on triage board
+
+## Block: Product Build
+- Date: 2026-03-10
+- Scope: First implementation pass for static ticket templates in the Laravel report flow.
+- Changes:
+  - Added static template configuration in `site-bulletin/config/ticket_templates.php`.
+  - Reworked the ticket report controller to load role-filtered templates instead of hardcoded fast-report presets.
+  - Wired the report page to:
+    - preload title, description, location, category, and default priority from template config
+    - show template-specific prompts and evidence hints
+    - keep the generic ticket form as a fallback when no template is selected
+  - Added manager-only templates for:
+    - `report_on_behalf`
+    - `department_blocker`
+  - Template default priority is now applied when the ticket is actually created.
+- Rationale:
+  - Establish the ticket-template model without requiring schema changes yet.
+  - Keep implementation low-risk by layering templates on top of the existing ticket workflow first.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `php artisan test --filter=FastIssueReportingTest`
+  - `npx playwright test tests/Browser/smoke.spec.ts`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-10
+- Scope: Second ticket-template pass with schema-backed template identity and structured details.
+- Changes:
+  - Added ticket persistence fields:
+    - `template_key`
+    - `details_json`
+  - Extended the report flow to save template-specific structured answers alongside the main ticket description.
+  - Updated ticket detail to show:
+    - template label
+    - structured template answers in a dedicated summary block
+  - Kept the generic description as the main human-readable narrative, with structured details acting as supplemental context.
+- Rationale:
+  - Move template support from UI-only preload into actual persisted ticket data.
+  - Prepare the model for a later approval/routing phase without introducing that complexity yet.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `php artisan test --filter=FastIssueReportingTest`
+  - `php artisan test --filter=TicketLifecycleTransparencyTest`
+  - `npx playwright test tests/Browser/smoke.spec.ts`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-10
+- Scope: First approval and routing layer for approval-backed ticket templates.
+- Changes:
+  - Added `ticket_approvals` persistence with:
+    - approver role
+    - approval status
+    - public note
+    - internal note
+    - approver identity and decision timestamp
+  - Added approval config for:
+    - `missed_punch` -> HR review
+    - `shift_swap_request` -> manager review
+  - Ticket creation now auto-creates a pending approval record for approval-backed templates.
+  - Ticket detail now shows a plain-language approval state for requesters and decision controls for eligible managers / HR / admin users.
+  - Approval decisions currently drive ticket status as follows:
+    - `approved` -> `resolved`
+    - `rejected` -> `cancelled`
+    - `needs_info` -> `waiting_employee`
+- Rationale:
+  - Introduce a usable approval-backed workflow without yet committing to full multi-step approval orchestration.
+  - Keep requester communication simple while preserving internal notes for resolver roles.
+
+## Block: Validation
+- Date: 2026-03-10
+- Commands:
+  - `php artisan test --filter=TicketApprovalFlowTest`
+  - `php artisan test --filter=FastIssueReportingTest`
+  - `php artisan test --filter=TicketLifecycleTransparencyTest`
+  - `npx playwright test tests/Browser/smoke.spec.ts`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-11
+- Scope: Multi-step approval extension for shift swaps and lightweight approval queue visibility.
+- Changes:
+  - Extended ticket approvals with queued follow-up steps and explicit `step_order`.
+  - `shift_swap_request` now creates:
+    - step 1: manager review (`pending`)
+    - step 2: HR review (`queued`)
+  - When manager review is approved:
+    - HR review becomes active
+    - ticket moves to `triaged` instead of resolving immediately
+  - Added a lightweight `Approvals Waiting For You` queue on the ticket index for manager/HR/admin users.
+  - Ticket detail now shows:
+    - step numbers
+    - queued-step messaging
+    - requester-facing text for the next review stage
+- Rationale:
+  - Align shift swap workflow more closely with the intended real-world pattern where manager approval is not necessarily final.
+  - Expose pending approval work without requiring a separate full queue application yet.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `php artisan test --filter=TicketApprovalFlowTest`
+  - `php artisan test --filter=FastIssueReportingTest`
+  - `php artisan test --filter=TicketIndexViewTest`
+  - `npx playwright test tests/Browser/smoke.spec.ts`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-11
+- Scope: Approval messaging refinement and final HR approval completion path.
+- Changes:
+  - Added requester-facing approval guidance that distinguishes:
+    - current manager review
+    - queued HR finalization
+    - active weekday HR review
+    - completed approval chain
+  - Added explicit final HR approval path for shift swaps so the second step resolves the ticket when completed.
+  - Split approval presentation into:
+    - current approval state
+    - separate approval history
+  - Kept internal approval notes restricted to manager/HR/admin viewers.
+- Rationale:
+  - Make the approval workflow understandable to employees without exposing internal resolver context.
+  - Reflect the real-world distinction between current approval step and later weekday HR finalization.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `php artisan test --filter=TicketApprovalFlowTest`
+  - `php artisan test --filter=TicketLifecycleTransparencyTest`
+  - `npx playwright test tests/Browser/smoke.spec.ts`
+- Result: Passed.
+
 ## Block: Implementation Backlog
 - Date: 2026-03-10
 - Scope: Actionable feature backlog for future agents.

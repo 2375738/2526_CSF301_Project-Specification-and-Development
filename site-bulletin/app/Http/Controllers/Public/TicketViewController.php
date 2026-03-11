@@ -7,6 +7,7 @@ use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Models\Category;
 use App\Models\Ticket;
+use App\Models\TicketApproval;
 use App\Models\TicketComment;
 use App\Models\TicketStatusChange;
 use App\Models\User;
@@ -99,11 +100,18 @@ class TicketViewController extends Controller
             ->orderBy('name')
             ->pluck('name', 'id');
 
+        $approvalQueue = collect();
+
+        if ($user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
+            $approvalQueue = $this->buildApprovalQueue($user);
+        }
+
         return view('tickets.index', [
             'tickets' => $tickets,
             'filters' => $request->only(['status', 'search', 'mine', 'department_id', 'overdue', 'breached', 'from_date', 'to_date', 'category_id']),
             'departmentFilterOptions' => $departmentFilterOptions,
             'categoryFilterOptions' => $categoryFilterOptions,
+            'approvalQueue' => $approvalQueue,
         ]);
     }
 
@@ -121,6 +129,7 @@ class TicketViewController extends Controller
             'statusChanges.user',
             'duplicateOf',
             'duplicates',
+            'approvals.approver',
         ]);
 
         $commentsQuery = $ticket->comments()->with('author');
@@ -149,6 +158,24 @@ class TicketViewController extends Controller
                 'detail' => $this->statusTimelineDetail($change),
             ];
         });
+        $templateMeta = $ticket->template_key
+            ? collect(config('ticket_templates', []))->get($ticket->template_key)
+            : null;
+        $approvalSummary = $ticket->approvals->map(function ($approval) {
+            return [
+                'id' => $approval->id,
+                'step_order' => $approval->step_order,
+                'step_key' => $approval->step_key,
+                'approver_role' => $approval->approver_role,
+                'status' => $approval->status,
+                'status_label' => $approval->publicStatusLabel(),
+                'public_note' => $approval->public_note,
+                'internal_note' => $approval->internal_note,
+                'approver_name' => $approval->approver?->name,
+                'decided_at' => $approval->decided_at,
+            ];
+        });
+        $approvalContext = $this->buildApprovalContext($ticket->approvals);
 
         return view('tickets.show', [
             'ticket' => $ticket,
@@ -156,10 +183,102 @@ class TicketViewController extends Controller
             'sla' => $sla,
             'lifecycle' => $lifecycle,
             'timelineEntries' => $timelineEntries,
+            'templateMeta' => $templateMeta,
+            'approvalSummary' => $approvalSummary,
+            'approvalContext' => $approvalContext,
             'statusOptions' => TicketStatus::cases(),
             'priorityOptions' => TicketPriority::cases(),
             'assignableUsers' => $assignableUsers,
         ]);
+    }
+
+    protected function buildApprovalQueue(User $user): Collection
+    {
+        $query = Ticket::query()
+            ->with(['requester:id,name', 'department:id,name', 'approvals' => fn ($q) => $q->where('status', \App\Models\TicketApproval::STATUS_PENDING)->orderBy('step_order')])
+            ->whereHas('approvals', function ($approvalQuery) use ($user) {
+                $approvalQuery->where('status', \App\Models\TicketApproval::STATUS_PENDING);
+
+                if ($user->hasRole('hr', 'admin')) {
+                    return;
+                }
+
+                $managedDepartmentIds = $user->managedDepartments()->pluck('departments.id');
+
+                $approvalQuery->where('approver_role', 'manager');
+                $approvalQuery->whereHas('ticket', fn ($ticketQuery) => $ticketQuery->whereIn('department_id', $managedDepartmentIds));
+            })
+            ->orderByDesc('updated_at')
+            ->take(4)
+            ->get();
+
+        return $query->map(function (Ticket $ticket) {
+            $approval = $ticket->approvals->first();
+
+            return [
+                'ticket_id' => $ticket->id,
+                'title' => $ticket->title,
+                'requester_name' => $ticket->requester?->name,
+                'department_name' => $ticket->department?->name,
+                'step_key' => $approval?->step_key,
+                'approver_role' => $approval?->approver_role,
+                'status_label' => $approval?->publicStatusLabel(),
+            ];
+        });
+    }
+
+    protected function buildApprovalContext(Collection $approvals): array
+    {
+        if ($approvals->isEmpty()) {
+            return [
+                'current' => collect(),
+                'history' => collect(),
+                'requester_status' => null,
+                'requester_note' => null,
+            ];
+        }
+
+        $current = $approvals
+            ->filter(fn (TicketApproval $approval) => in_array($approval->status, [TicketApproval::STATUS_PENDING, TicketApproval::STATUS_QUEUED], true))
+            ->sortBy('step_order')
+            ->values();
+
+        $history = $approvals
+            ->filter(fn (TicketApproval $approval) => ! in_array($approval->status, [TicketApproval::STATUS_PENDING, TicketApproval::STATUS_QUEUED], true))
+            ->sortByDesc('step_order')
+            ->values();
+
+        $active = $current->firstWhere('status', TicketApproval::STATUS_PENDING);
+        $queued = $current->firstWhere('status', TicketApproval::STATUS_QUEUED);
+
+        $requesterStatus = null;
+        $requesterNote = null;
+
+        if ($active?->approver_role === 'manager') {
+            $requesterStatus = 'Awaiting manager approval';
+            $requesterNote = $queued
+                ? 'Manager approval is the current step. HR finalization will only start after the manager signs off.'
+                : 'A manager decision is needed before this request can move forward.';
+        } elseif ($active?->approver_role === 'hr') {
+            $requesterStatus = 'Awaiting weekday HR review';
+            $requesterNote = 'HR review is pending. Night HR coverage can usually request more information or handle basic attendance fixes, but final approval may wait for the weekday HR team.';
+        } elseif ($queued?->approver_role === 'hr') {
+            $requesterStatus = 'Queued for weekday HR review';
+            $requesterNote = 'The next approval step is HR finalization. That review will start only after the current approval is completed.';
+        } elseif ($history->isNotEmpty() && $history->every(fn (TicketApproval $approval) => $approval->status === TicketApproval::STATUS_APPROVED)) {
+            $requesterStatus = 'All approval steps complete';
+            $requesterNote = 'The approval chain is complete. The ticket should now move into completion or confirmation.';
+        } elseif ($history->contains(fn (TicketApproval $approval) => $approval->status === TicketApproval::STATUS_NEEDS_INFO)) {
+            $requesterStatus = 'Approval waiting on more information from you';
+            $requesterNote = 'One of the approval steps requested more information before the workflow can continue.';
+        }
+
+        return [
+            'current' => $current,
+            'history' => $history,
+            'requester_status' => $requesterStatus,
+            'requester_note' => $requesterNote,
+        ];
     }
 
     /**

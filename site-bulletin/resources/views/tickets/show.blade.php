@@ -16,6 +16,9 @@
           </div>
           <h1 class="mt-1 text-2xl font-semibold text-slate-900">{{ $ticket->title }}</h1>
           <div class="mt-2 text-sm text-slate-600 space-y-1">
+            @if ($templateMeta)
+              <p>Template: <span class="font-medium text-slate-800">{{ $templateMeta['label'] ?? $ticket->template_key }}</span></p>
+            @endif
             <p>Category: <span class="font-medium text-slate-800">{{ $ticket->category?->name ?? 'Uncategorised' }}</span></p>
             @if ($ticket->location)
               <p>Location: <span class="font-medium text-slate-800">{{ $ticket->location }}</span></p>
@@ -52,6 +55,22 @@
       <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         {!! nl2br(e($ticket->description)) !!}
       </div>
+
+      @if (! empty($ticket->details_json))
+        <div class="mt-4 rounded-lg border border-slate-200 bg-white px-4 py-4">
+          <h2 class="text-sm font-semibold text-slate-900">Structured Details</h2>
+          <dl class="mt-3 grid gap-3 md:grid-cols-2">
+            @foreach ($ticket->details_json as $detail)
+              @if (! empty($detail['label']) && ! empty($detail['value']))
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $detail['label'] }}</dt>
+                  <dd class="mt-1 text-sm text-slate-800">{{ $detail['value'] }}</dd>
+                </div>
+              @endif
+            @endforeach
+          </dl>
+        </div>
+      @endif
     </div>
 
     <div class="grid gap-6 md:grid-cols-3">
@@ -127,6 +146,140 @@
             </div>
           </div>
         </section>
+
+        @if (($approvalSummary ?? collect())->isNotEmpty())
+          <section class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-4">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Approval Status</h2>
+              <p class="mt-1 text-sm text-slate-600">Track the approval path for request-based tickets such as missed punch corrections and shift swaps.</p>
+            </div>
+
+            @if (($approvalContext['requester_status'] ?? null) || ($approvalContext['requester_note'] ?? null))
+              <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-4">
+                @if ($approvalContext['requester_status'] ?? null)
+                  <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Approval progress</p>
+                  <p class="mt-1 text-sm font-semibold text-blue-900">{{ $approvalContext['requester_status'] }}</p>
+                @endif
+                @if ($approvalContext['requester_note'] ?? null)
+                  <p class="mt-2 text-sm text-blue-900">{{ $approvalContext['requester_note'] }}</p>
+                @endif
+              </div>
+            @endif
+
+            @foreach ($approvalSummary as $approval)
+              <div class="rounded-lg border border-slate-200 px-4 py-4 space-y-3">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Step {{ $approval['step_order'] }} · {{ str_replace('_', ' ', $approval['step_key']) }}</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ $approval['status_label'] }}</p>
+                    <p class="mt-1 text-sm text-slate-600">
+                      Reviewer group: {{ ucfirst($approval['approver_role']) }}
+                      @if ($approval['approver_name'])
+                        · Decision by {{ $approval['approver_name'] }}
+                      @endif
+                    </p>
+                  </div>
+                  @if ($approval['decided_at'])
+                    <span class="text-xs text-slate-500">{{ $approval['decided_at']->diffForHumans() }}</span>
+                  @endif
+                </div>
+
+                @if ($approval['public_note'])
+                  <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                    {{ $approval['public_note'] }}
+                  </div>
+                @endif
+
+                @if ($approval['status'] === 'queued')
+                  <p class="text-xs text-slate-500">This step becomes active only after the previous approval step is completed.</p>
+                @endif
+
+                @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin') && $approval['internal_note'])
+                  <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                    <p class="font-semibold">Internal note</p>
+                    <p class="mt-1">{{ $approval['internal_note'] }}</p>
+                  </div>
+                @endif
+
+                @php
+                  $canApprove = false;
+
+                  if ($approval['approver_role'] === 'hr') {
+                      $canApprove = auth()->user()->hasRole('hr', 'admin');
+                  } elseif ($approval['approver_role'] === 'manager') {
+                      $managedDepartmentIds = auth()->user()->managedDepartments()->pluck('departments.id');
+                      $canApprove = auth()->user()->hasRole('hr', 'admin')
+                          || (
+                              auth()->user()->hasRole('manager', 'ops_manager')
+                              && $ticket->department_id
+                              && $managedDepartmentIds->contains($ticket->department_id)
+                          );
+                  }
+                @endphp
+
+                @if ($approval['status'] === 'pending' && $canApprove)
+                  <form action="{{ route('tickets.approvals.update', [$ticket, $approval['id']]) }}" method="POST" class="space-y-3">
+                    @csrf
+                    @method('PATCH')
+                    <div class="grid gap-3 md:grid-cols-2">
+                      <label class="block text-sm font-medium text-slate-700">
+                        Public note
+                        <textarea name="public_note" rows="3" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                      </label>
+                      <label class="block text-sm font-medium text-slate-700">
+                        Internal note
+                        <textarea name="internal_note" rows="3" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"></textarea>
+                      </label>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <button type="submit" name="decision" value="approved" class="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700">
+                        Approve
+                      </button>
+                      <button type="submit" name="decision" value="needs_info" class="inline-flex items-center rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700">
+                        Need More Info
+                      </button>
+                      <button type="submit" name="decision" value="rejected" class="inline-flex items-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700">
+                        Reject
+                      </button>
+                    </div>
+                  </form>
+                @endif
+              </div>
+            @endforeach
+          </section>
+
+          @if (($approvalContext['history'] ?? collect())->isNotEmpty())
+            <section class="bg-white shadow-sm rounded-xl px-6 py-5">
+              <h2 class="text-lg font-semibold text-slate-900">Approval History</h2>
+              <ul class="mt-4 space-y-4">
+                @foreach ($approvalContext['history'] as $approval)
+                  <li class="relative border-l-2 border-slate-200 pl-4">
+                    <div class="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-emerald-500"></div>
+                    <p class="text-sm font-semibold text-slate-800">
+                      Step {{ $approval->step_order }} · {{ str_replace('_', ' ', $approval->step_key) }}
+                      <span class="font-normal text-slate-500">· {{ $approval->publicStatusLabel() }}</span>
+                    </p>
+                    <p class="text-xs text-slate-500">
+                      {{ ucfirst($approval->approver_role) }}
+                      @if ($approval->approver?->name)
+                        · {{ $approval->approver->name }}
+                      @endif
+                      @if ($approval->decided_at)
+                        · {{ $approval->decided_at->format('M j, Y H:i') }}
+                      @endif
+                    </p>
+                    @if ($approval->public_note)
+                      <p class="mt-1 text-sm text-slate-600">{{ $approval->public_note }}</p>
+                    @endif
+                    @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin') && $approval->internal_note)
+                      <p class="mt-1 text-sm text-amber-800">Internal note: {{ $approval->internal_note }}</p>
+                    @endif
+                  </li>
+                @endforeach
+              </ul>
+            </section>
+          @endif
+        @endif
 
         <section class="bg-white shadow-sm rounded-xl px-6 py-5">
           <h2 class="text-lg font-semibold text-slate-900">Status Timeline</h2>

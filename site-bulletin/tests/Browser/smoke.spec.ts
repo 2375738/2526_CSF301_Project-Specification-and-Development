@@ -63,9 +63,9 @@ test('employee can use knowledge search to find scanner guidance', async ({ page
 test('employee fast report preset preloads the issue form', async ({ page }) => {
   await loginWithPreset(page, 'Employee');
 
-  await page.goto('/tickets/report?preset=scanner');
+  await page.goto('/tickets/report?template=scanner_issue');
   await expect(page.getByRole('heading', { name: 'Report an Issue' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Fast Report' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ticket Templates' })).toBeVisible();
   await expect(page.locator('input[name="title"]')).toHaveValue('Scanner issue at station');
   await expect(page.locator('textarea[name="description"]')).toContainText('Scanner problem observed.');
 });

@@ -49,6 +49,9 @@ Route::middleware('auth')->group(function () {
 
         Route::patch('/{ticket}/status', [TicketStatusController::class, 'update'])
             ->name('status.update');
+
+        Route::patch('/{ticket}/approvals/{approval}', [\App\Http\Controllers\Public\TicketApprovalController::class, 'update'])
+            ->name('approvals.update');
     });
 
     Route::get('/attachments/{attachment}', [TicketAttachmentController::class, 'download'])

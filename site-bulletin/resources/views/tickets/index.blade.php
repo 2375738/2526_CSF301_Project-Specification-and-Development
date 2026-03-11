@@ -29,6 +29,35 @@
       </div>
     </div>
 
+    @if (($approvalQueue ?? collect())->isNotEmpty())
+      <div class="bg-white shadow-sm rounded-xl px-6 py-5">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">Approvals Waiting For You</h2>
+            <p class="mt-1 text-sm text-slate-600">Request-based tickets that need a manager or HR decision before they can complete.</p>
+          </div>
+        </div>
+        <div class="mt-4 grid gap-3 md:grid-cols-2">
+          @foreach ($approvalQueue as $approvalItem)
+            <a href="{{ route('tickets.show', $approvalItem['ticket_id']) }}" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-blue-300 hover:bg-blue-50">
+              <p class="text-sm font-semibold text-slate-900">{{ $approvalItem['title'] }}</p>
+              <p class="mt-1 text-xs text-slate-500">
+                {{ ucfirst(str_replace('_', ' ', $approvalItem['step_key'] ?? 'review')) }}
+                · {{ ucfirst($approvalItem['approver_role'] ?? 'team') }}
+                @if ($approvalItem['department_name'])
+                  · {{ $approvalItem['department_name'] }}
+                @endif
+              </p>
+              <p class="mt-2 text-sm text-slate-700">{{ $approvalItem['status_label'] }}</p>
+              @if ($approvalItem['requester_name'])
+                <p class="mt-1 text-xs text-slate-500">Requester: {{ $approvalItem['requester_name'] }}</p>
+              @endif
+            </a>
+          @endforeach
+        </div>
+      </div>
+    @endif
+
     <form method="GET" action="{{ route('tickets.index') }}" class="bg-white shadow-sm rounded-xl px-6 py-4 flex flex-wrap items-center gap-3">
       <label class="flex-1 min-w-[160px] text-sm text-slate-600">
         <span class="sr-only">Search</span>

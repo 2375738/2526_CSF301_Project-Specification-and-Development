@@ -10,10 +10,12 @@ use App\Models\Category;
 use App\Models\Ticket;
 use App\Models\Department;
 use App\Models\User;
+use App\Models\TicketApproval;
 use App\Services\NotificationService;
 use App\Services\SLAService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -26,14 +28,14 @@ class ReportTicketController extends Controller
 
         $user = $request->user();
         $categories = Category::orderBy('order')->get();
-        $presetKey = (string) $request->query('preset', old('preset', ''));
-        $quickPresets = $this->buildQuickPresets($categories);
-        $selectedPreset = $quickPresets->firstWhere('key', $presetKey);
+        $templateKey = (string) $request->query('template', $request->query('preset', old('template', old('preset', ''))));
+        $ticketTemplates = $this->buildTicketTemplates($categories, $user);
+        $selectedTemplate = $ticketTemplates->firstWhere('key', $templateKey);
 
-        $title = old('title', $request->query('title', $selectedPreset['title'] ?? null));
-        $description = old('description', $request->query('description', $selectedPreset['description_template'] ?? null));
-        $location = old('location', $request->query('location', $selectedPreset['location'] ?? null));
-        $categoryId = (int) old('category_id', $request->query('category_id', $selectedPreset['category_id'] ?? null));
+        $title = old('title', $request->query('title', $selectedTemplate['title'] ?? null));
+        $description = old('description', $request->query('description', $selectedTemplate['description_template'] ?? null));
+        $location = old('location', $request->query('location', $selectedTemplate['location_label'] ?? null));
+        $categoryId = (int) old('category_id', $request->query('category_id', $selectedTemplate['category_id'] ?? null));
 
         $similarTickets = $this->similarTickets(
             $user,
@@ -67,8 +69,8 @@ class ReportTicketController extends Controller
             'canActOnBehalf' => $canActOnBehalf,
             'employeeOptions' => $employeeOptions,
             'departmentOptions' => $departmentOptions,
-            'quickPresets' => $quickPresets,
-            'selectedPreset' => $selectedPreset,
+            'ticketTemplates' => $ticketTemplates,
+            'selectedTemplate' => $selectedTemplate,
             'prefillTitle' => $title,
             'prefillDescription' => $description,
             'prefillLocation' => $location,
@@ -82,6 +84,14 @@ class ReportTicketController extends Controller
         NotificationService $notifier
     ): RedirectResponse {
         $user = $request->user();
+        $templateKey = (string) $request->input('template', $request->input('preset', ''));
+        $template = $this->buildTicketTemplates(Category::orderBy('order')->get(), $user)->firstWhere('key', $templateKey);
+
+        if ($templateKey !== '' && ! $template) {
+            return Redirect::back()
+                ->withErrors(['template' => 'The selected ticket template is not available for your role.'])
+                ->withInput();
+        }
 
         $canActOnBehalf = $user->hasRole('manager', 'ops_manager', 'hr', 'admin');
         $createdFor = null;
@@ -118,15 +128,25 @@ class ReportTicketController extends Controller
             $departmentId = $createdFor?->primary_department_id ?? $user->primary_department_id;
         }
 
+        $detailAnswers = collect($request->input('detail_answers', []))
+            ->map(fn ($value) => is_string($value) ? trim($value) : null)
+            ->values();
+
+        $detailPayload = $template
+            ? $this->buildStructuredDetails($template, $detailAnswers)
+            : [];
+
         $ticket = Ticket::create([
             'requester_id' => $user->id,
             'created_for_id' => $createdFor?->id,
             'department_id' => $departmentId,
+            'template_key' => $template['key'] ?? null,
             'category_id' => $request->integer('category_id'),
-            'priority' => TicketPriority::Medium->value,
+            'priority' => $template['default_priority'] ?? TicketPriority::Medium->value,
             'status' => TicketStatus::New->value,
             'title' => trim((string) $request->input('title')),
             'description' => trim((string) $request->input('description')),
+            'details_json' => $detailPayload,
             'location' => $request->filled('location') ? trim((string) $request->input('location')) : null,
         ]);
 
@@ -136,6 +156,16 @@ class ReportTicketController extends Controller
             'to_status' => TicketStatus::New->value,
             'reason' => 'Ticket created by requester',
         ]);
+
+        foreach ($this->approvalStepsForTemplate($template) as $index => $step) {
+            $ticket->approvals()->create([
+                'step_order' => $index + 1,
+                'step_key' => $step['step_key'],
+                'approver_role' => $step['approver_role'],
+                'status' => $index === 0 ? TicketApproval::STATUS_PENDING : TicketApproval::STATUS_QUEUED,
+                'public_note' => $step['requester_status'] ?? null,
+            ]);
+        }
 
         if ($file = $request->file('attachment')) {
             $ticket->attachments()->create([
@@ -236,7 +266,7 @@ class ReportTicketController extends Controller
         return $query->get();
     }
 
-    protected function buildQuickPresets(Collection $categories): Collection
+    protected function buildTicketTemplates(Collection $categories, User $user): Collection
     {
         $categoryLookup = $categories->keyBy(fn (Category $category) => Str::lower($category->name));
 
@@ -251,53 +281,89 @@ class ReportTicketController extends Controller
             return null;
         };
 
-        return collect([
-            [
-                'key' => 'scanner',
-                'label' => 'Scanner issue',
-                'description' => 'Battery, login, pairing, or connection problem.',
-                'title' => 'Scanner issue at station',
-                'description_template' => 'Scanner problem observed. Device is not working as expected and is blocking task progress.',
-                'location' => 'Station / area',
-                'category_id' => $resolveCategoryId(['IT Support', 'Operations']),
-            ],
-            [
-                'key' => 'safety',
-                'label' => 'Safety concern',
-                'description' => 'Hazard, spill, blocked path, or damaged equipment.',
-                'title' => 'Safety concern in work area',
-                'description_template' => 'Safety concern observed. Immediate risk and impact need review.',
-                'location' => 'Affected area',
-                'category_id' => $resolveCategoryId(['Safety', 'Operations']),
-            ],
-            [
-                'key' => 'facilities',
-                'label' => 'Facilities issue',
-                'description' => 'Door, lighting, printer, workstation, or canteen issue.',
-                'title' => 'Facilities issue affecting work area',
-                'description_template' => 'Facilities issue observed. The problem is affecting normal work or access.',
-                'location' => 'Affected area',
-                'category_id' => $resolveCategoryId(['Facilities', 'Operations']),
-            ],
-            [
-                'key' => 'transport',
-                'label' => 'Transport problem',
-                'description' => 'Bus, shuttle, parking, or route disruption.',
-                'title' => 'Transport problem for shift travel',
-                'description_template' => 'Transport issue observed. Include route, stop, and impact on arrival or departure.',
-                'location' => 'Bus stop / route',
-                'category_id' => $resolveCategoryId(['Transport']),
-            ],
-        ])->map(function (array $preset): array {
+        return collect(config('ticket_templates', []))
+            ->map(function (array $template, string $key) use ($resolveCategoryId, $user): ?array {
+                if (! in_array($user->role?->value ?? $user->role, $template['requester_roles'] ?? [], true)) {
+                    return null;
+                }
+
+                $categoryId = $resolveCategoryId($template['category_names'] ?? []);
+
+                if (! $categoryId) {
+                    return null;
+                }
+
+                return [
+                    'key' => $key,
+                    'label' => $template['label'],
+                    'description' => $template['description'],
+                    'title' => $template['title'],
+                    'description_template' => $template['description_template'],
+                    'location_label' => $template['location_label'],
+                    'category_id' => $categoryId,
+                    'default_priority' => $template['default_priority'] ?? TicketPriority::Medium->value,
+                    'detail_prompts' => $template['detail_prompts'] ?? [],
+                    'evidence_hint' => $template['evidence_hint'] ?? null,
+                    'requester_roles' => $template['requester_roles'] ?? [],
+                    'approval' => $template['approval'] ?? null,
+                    'approval_steps' => $template['approval_steps'] ?? null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->map(function (array $template): array {
             return [
-                'key' => $preset['key'],
-                'label' => $preset['label'],
-                'description' => $preset['description'],
-                'title' => $preset['title'],
-                'description_template' => $preset['description_template'],
-                'location' => $preset['location'],
-                'category_id' => $preset['category_id'],
+                'key' => $template['key'],
+                'label' => $template['label'],
+                'description' => $template['description'],
+                'title' => $template['title'],
+                'description_template' => $template['description_template'],
+                'location_label' => $template['location_label'],
+                'category_id' => $template['category_id'],
+                'default_priority' => $template['default_priority'],
+                'detail_prompts' => $template['detail_prompts'],
+                'evidence_hint' => $template['evidence_hint'],
+                'approval' => $template['approval'],
+                'approval_steps' => $template['approval_steps'],
             ];
-        })->filter(fn (array $preset) => $preset['category_id'] !== null)->values();
+        });
+    }
+
+    protected function buildStructuredDetails(array $template, Collection $detailAnswers): array
+    {
+        return collect($template['detail_prompts'] ?? [])
+            ->values()
+            ->map(function (string $prompt, int $index) use ($detailAnswers): ?array {
+                $answer = $detailAnswers->get($index);
+
+                if (! is_string($answer) || $answer === '') {
+                    return null;
+                }
+
+                return [
+                    'label' => $prompt,
+                    'value' => $answer,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    protected function approvalStepsForTemplate(?array $template): Collection
+    {
+        if (! $template) {
+            return collect();
+        }
+
+        if (! empty($template['approval_steps'])) {
+            return collect($template['approval_steps']);
+        }
+
+        if (! empty($template['approval'])) {
+            return collect([$template['approval']]);
+        }
+
+        return collect();
     }
 }
