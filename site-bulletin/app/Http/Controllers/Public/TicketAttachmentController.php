@@ -21,8 +21,12 @@ class TicketAttachmentController extends Controller
     ): RedirectResponse {
         $this->authorize('upload', $ticket);
 
+        $data = $request->validated();
         $file = $request->file('attachment');
         $user = $request->user();
+        $visibility = $user->hasRole('manager', 'ops_manager', 'hr', 'admin')
+            ? ($data['visibility'] ?? TicketAttachment::VISIBILITY_PUBLIC)
+            : TicketAttachment::VISIBILITY_PUBLIC;
 
         $attachment = $ticket->attachments()->create([
             'user_id' => $user->id,
@@ -35,6 +39,9 @@ class TicketAttachmentController extends Controller
             'original_name' => $file->getClientOriginalName(),
             'mime' => $file->getClientMimeType(),
             'size' => $file->getSize(),
+            'visibility' => $visibility,
+            'kind' => $data['kind'],
+            'label' => $data['label'] ?? null,
         ]);
 
         $notifier->commentAdded($ticket, $user, false);
@@ -45,8 +52,10 @@ class TicketAttachmentController extends Controller
     public function download(TicketAttachment $attachment): StreamedResponse
     {
         $ticket = $attachment->ticket;
+        $user = request()->user();
 
         $this->authorize('view', $ticket);
+        abort_unless($user && $attachment->visibleTo($user), 403);
 
         if (! Storage::disk($attachment->disk)->exists($attachment->path)) {
             abort(404, 'Attachment file not found');

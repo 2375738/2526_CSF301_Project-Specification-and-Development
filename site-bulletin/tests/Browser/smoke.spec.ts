@@ -7,6 +7,11 @@ async function loginWithPreset(page: Page, role: 'Employee' | 'Manager') {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
+async function logout(page: Page) {
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page).toHaveURL(/\/$/);
+}
+
 test('manager demo login exposes the full navigation shell', async ({ page }) => {
   await loginWithPreset(page, 'Manager');
 
@@ -137,7 +142,52 @@ test('manager does not see or access the triage board', async ({ page }) => {
 
   await page.goto('/tickets');
   await expect(page.getByRole('link', { name: 'Open triage board' })).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Approval workbench' })).toBeVisible();
 
   const response = await page.goto('/tickets/triage');
   expect(response?.status()).toBe(403);
+});
+
+test('manager can open the approval workbench', async ({ page }) => {
+  await loginWithPreset(page, 'Manager');
+
+  await page.goto('/tickets');
+  await page.getByRole('link', { name: 'Approval workbench' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Approval Workbench' })).toBeVisible();
+  await expect(page.getByText('Review request-style tickets that need manager or HR decisions')).toBeVisible();
+});
+
+test('employee can submit a shift swap request and manager can approve it from the workbench', async ({ page }) => {
+  const ticketTitle = `Shift swap browser test ${Date.now()}`;
+
+  await loginWithPreset(page, 'Employee');
+
+  await page.goto('/tickets/report?template=shift_swap_request');
+  await expect(page.getByRole('heading', { name: 'Report an Issue' })).toBeVisible();
+  await page.locator('input[name="title"]').fill(ticketTitle);
+  await page.locator('textarea[name="description"]').fill('Browser test shift swap request.');
+  await page.locator('input[name="detail_answers[]"]').nth(0).fill('2026-03-14 10:00');
+  await page.locator('input[name="detail_answers[]"]').nth(1).fill('2026-03-16 10:00');
+  await page.locator('input[name="detail_answers[]"]').nth(2).fill('Browser Test Partner');
+  await page.getByRole('button', { name: 'Submit Ticket' }).click();
+
+  await expect(page.getByText(/Ticket #\d+ created\./)).toBeVisible();
+  await expect(page.getByRole('heading', { name: ticketTitle })).toBeVisible();
+
+  await logout(page);
+  await loginWithPreset(page, 'Manager');
+
+  await page.goto('/tickets/approvals');
+  await expect(page.getByRole('heading', { name: 'Approval Workbench' })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search approvals' }).fill(ticketTitle);
+  await page.getByRole('button', { name: 'Apply' }).click();
+
+  const approvalCard = page.locator('article').filter({ hasText: ticketTitle }).first();
+  await expect(approvalCard).toBeVisible();
+  await approvalCard.getByRole('textbox', { name: 'Public note' }).fill('Approved from browser smoke test.');
+  await approvalCard.getByRole('button', { name: 'Approve' }).click();
+
+  await expect(page.getByText('Approval decision saved.')).toBeVisible();
+  await expect(page.locator('article').filter({ hasText: ticketTitle }).first().getByText('Approved from browser smoke test.')).toBeVisible();
 });

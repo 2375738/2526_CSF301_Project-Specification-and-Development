@@ -606,6 +606,141 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - `npx playwright test tests/Browser/smoke.spec.ts`
 - Result: Passed.
 
+## Block: Product Build
+- Date: 2026-03-11
+- Scope: Dedicated approval workbench for manager and HR decision queues.
+- Changes:
+  - Added a dedicated approval queue page at `tickets/approvals` for `manager`, `ops_manager`, `hr`, and `admin`.
+  - The new workbench shows:
+    - queue summary counts for `pending`, `queued`, `needs_info`, and completed approval steps
+    - searchable approval list with filters for status, reviewer role, step, and department
+    - direct links back to the underlying ticket detail page
+  - Approval scoping is now explicit:
+    - `hr` and `admin` can see all approval steps
+    - `manager` and `ops_manager` only see manager-review steps for their managed departments
+    - users without approval roles are blocked at the route level
+  - Added a new `Approval workbench` entry point from the tickets index page.
+- Rationale:
+  - The lightweight approval cards on the ticket index were sufficient for first-pass visibility, but not for actual review work.
+  - Manager and HR users need a queue-oriented workbench so approval-backed templates can scale beyond one or two visible cards.
+
+## Block: Testing
+- Date: 2026-03-11
+- Scope: Browser smoke stability for schema-backed approval features.
+- Changes:
+  - Updated Playwright web server bootstrap to run `php artisan migrate --force` before starting the local Laravel server.
+  - Disabled Playwright `reuseExistingServer` so new routes and migrations are not hidden behind a stale long-running dev server process.
+  - Added browser smoke coverage for opening the approval workbench from the tickets page as a manager.
+- Rationale:
+  - Schema-backed features such as ticket approvals were failing in browser tests when the reused dev database had not been migrated.
+  - Restarting the local server per Playwright run removes stale route-state and migration drift from the smoke pipeline.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `php artisan test --filter=TicketApprovalQueueTest`
+  - `php artisan test --filter=TicketApprovalFlowTest`
+  - `npx playwright test tests/Browser/smoke.spec.ts --grep "approval workbench|triage board"`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-11
+- Scope: Typed ticket evidence and attachment visibility controls.
+- Changes:
+  - Extended `ticket_attachments` with:
+    - `visibility` (`public`, `internal`)
+    - `kind` (`photo`, `screenshot`, `document`, `timesheet`, `other`)
+    - `label`
+  - Updated ticket attachment uploads so:
+    - employees can upload typed evidence but their attachments are always forced to `public`
+    - manager, ops manager, HR, and admin users can mark an attachment as `internal only`
+  - Ticket detail now:
+    - shows template evidence guidance when available
+    - labels evidence by kind
+    - shows internal-visibility badges only to privileged users
+    - hides internal-only attachments from employee requesters
+  - Attachment downloads now enforce attachment visibility, not just ticket visibility.
+- Rationale:
+  - The ticketing model needed typed evidence to support HR-style proof, safety photos, and resolver documents in a consistent way.
+  - Visibility controls are required so internal manager or HR evidence does not leak back to requesters.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `php artisan migrate --force`
+  - `php artisan test --filter=TicketAttachmentVisibilityTest`
+  - `php artisan test --filter=TicketLifecycleTransparencyTest`
+  - `php artisan test --filter=TicketApprovalQueueTest`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-11
+- Scope: Direct approval actions on the approval workbench.
+- Changes:
+  - Extended the approval workbench so pending approvals can now be decided directly from the queue page.
+  - Added inline decision controls for:
+    - `Approve`
+    - `Need Info`
+    - `Reject`
+  - Added separate fields for:
+    - requester-visible public note
+    - manager or HR internal note
+  - Added queue-state guidance on the workbench:
+    - queued steps are explicitly marked as not yet actionable
+    - `needs_info` steps are marked as paused
+    - completed steps point back to full ticket history
+- Rationale:
+  - The dedicated queue page needed to be operationally useful, not just a list of links.
+  - Direct decision controls reduce context switching for manager and HR users handling routine approval traffic.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `php artisan test --filter=TicketApprovalQueueTest`
+  - `php artisan test --filter=TicketApprovalFlowTest`
+- Result: Passed.
+
+## Block: Product Build
+- Date: 2026-03-11
+- Scope: Approval workbench prioritization and grouped queue buckets.
+- Changes:
+  - Refined the approval workbench with grouped queue buckets above the full result list:
+    - `Waiting Now`
+    - `Paused Waiting On Requester`
+    - `Completed Recently`
+  - Bucket contents are derived from the same filtered queue scope so reviewers can quickly focus on actionable work without losing filter context.
+  - Refactored the main approval card into a shared partial so direct decision controls and queue-state messaging stay consistent across the page.
+- Rationale:
+  - A flat approval list still required too much manual scanning for manager and HR users.
+  - Grouped buckets make the workbench usable as a real operational queue rather than only a searchable archive of approval rows.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `php artisan test --filter=TicketApprovalQueueTest`
+  - `php artisan test --filter=TicketApprovalFlowTest`
+- Result: Passed.
+
+## Block: Testing
+- Date: 2026-03-11
+- Scope: Browser coverage expansion for approval workbench actions.
+- Changes:
+  - Extended Playwright smoke coverage to verify:
+    - manager can open the approval workbench
+    - employee can submit a `shift_swap_request`
+    - manager can find that request in the approval workbench
+    - manager can approve the request inline from the workbench
+  - Added a browser-safe logout helper to support multi-role end-to-end approval testing in a single smoke flow.
+- Rationale:
+  - Approval workbench behavior now includes direct inline decisions, so browser coverage needed to move beyond simple page-load checks.
+  - This locks in the full employee-to-manager approval path at the UI layer, not just controller tests.
+
+## Block: Validation
+- Date: 2026-03-11
+- Commands:
+  - `npx playwright test tests/Browser/smoke.spec.ts --grep "approval workbench|shift swap request and manager can approve"`
+- Result: Passed.
+
 ## Block: Implementation Backlog
 - Date: 2026-03-10
 - Scope: Actionable feature backlog for future agents.

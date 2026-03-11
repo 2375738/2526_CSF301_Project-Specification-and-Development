@@ -176,6 +176,9 @@ class TicketViewController extends Controller
             ];
         });
         $approvalContext = $this->buildApprovalContext($ticket->approvals);
+        $visibleAttachments = $ticket->attachments
+            ->filter(fn ($attachment) => $attachment->visibleTo($request->user()))
+            ->values();
 
         return view('tickets.show', [
             'ticket' => $ticket,
@@ -186,6 +189,7 @@ class TicketViewController extends Controller
             'templateMeta' => $templateMeta,
             'approvalSummary' => $approvalSummary,
             'approvalContext' => $approvalContext,
+            'visibleAttachments' => $visibleAttachments,
             'statusOptions' => TicketStatus::cases(),
             'priorityOptions' => TicketPriority::cases(),
             'assignableUsers' => $assignableUsers,

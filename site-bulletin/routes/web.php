@@ -10,6 +10,7 @@ use App\Http\Controllers\Public\ReportTicketController;
 use App\Http\Controllers\Public\RoleChangeRequestController;
 use App\Http\Controllers\Public\KnowledgeSnippetController;
 use App\Http\Controllers\Public\TicketAttachmentController;
+use App\Http\Controllers\Public\TicketApprovalQueueController;
 use App\Http\Controllers\Public\TicketCommentController;
 use App\Http\Controllers\Public\TicketStatusController;
 use App\Http\Controllers\Public\TicketViewController;
@@ -25,6 +26,9 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('tickets')->name('tickets.')->group(function () {
         Route::get('/', [TicketViewController::class, 'index'])->name('index');
+        Route::get('/approvals', TicketApprovalQueueController::class)
+            ->name('approvals.index')
+            ->middleware('role:manager,ops_manager,hr,admin');
         Route::get('/triage', SupportTriageBoardController::class)
             ->name('triage')
             ->middleware('role:ops_manager,hr,admin');

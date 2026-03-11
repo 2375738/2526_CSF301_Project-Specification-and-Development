@@ -25,6 +25,9 @@ class TicketAttachmentFactory extends Factory
             'original_name' => basename($fakeFile),
             'mime' => fake()->mimeType(),
             'size' => fake()->numberBetween(10_000, 2_000_000),
+            'visibility' => 'public',
+            'kind' => 'other',
+            'label' => fake()->optional()->words(2, true),
         ];
     }
 }

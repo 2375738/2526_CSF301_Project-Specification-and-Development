@@ -379,13 +379,28 @@
 
         <section class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-3">
           <h2 class="text-lg font-semibold text-slate-900">Attachments</h2>
+          @if ($templateMeta && ! empty($templateMeta['evidence_hint']))
+            <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Evidence guidance: {{ $templateMeta['evidence_hint'] }}
+            </p>
+          @endif
           <ul class="space-y-2 text-sm text-slate-700">
-            @forelse ($ticket->attachments as $attachment)
+            @forelse (($visibleAttachments ?? collect()) as $attachment)
               <li class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
                 <div>
-                  <p class="font-medium text-slate-800">{{ $attachment->original_name }}</p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <p class="font-medium text-slate-800">{{ $attachment->label ?: $attachment->original_name }}</p>
+                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-700">
+                      {{ $attachment->kindLabel() }}
+                    </span>
+                    @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
+                      <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-blue-700">
+                        {{ $attachment->visibilityLabel() }}
+                      </span>
+                    @endif
+                  </div>
                   <p class="text-xs text-slate-500">
-                    Uploaded by {{ $attachment->uploader->name }} · {{ number_format(($attachment->size ?? 0) / 1024, 1) }} KB
+                    {{ $attachment->original_name }} · Uploaded by {{ $attachment->uploader->name }} · {{ number_format(($attachment->size ?? 0) / 1024, 1) }} KB
                   </p>
                 </div>
                 <a href="{{ $attachment->download_url }}" class="inline-flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-300">
@@ -402,7 +417,29 @@
           @can('upload', $ticket)
             <form action="{{ route('tickets.attachments.store', $ticket) }}" method="POST" enctype="multipart/form-data" class="space-y-2 text-sm">
               @csrf
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="block text-sm font-medium text-slate-700">
+                  Evidence type
+                  <select name="kind" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="photo">Photo</option>
+                    <option value="screenshot">Screenshot</option>
+                    <option value="document">Document</option>
+                    <option value="timesheet">Timesheet evidence</option>
+                    <option value="other">Other evidence</option>
+                  </select>
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                  Evidence label
+                  <input type="text" name="label" maxlength="120" placeholder="Optional short description" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" />
+                </label>
+              </div>
               <input type="file" name="attachment" required class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200" accept="image/jpeg,image/png,application/pdf" />
+              @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
+                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" name="visibility" value="internal" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                  Internal only attachment
+                </label>
+              @endif
               <button type="submit" class="inline-flex items-center rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-slate-900">
                 Upload Attachment
               </button>
