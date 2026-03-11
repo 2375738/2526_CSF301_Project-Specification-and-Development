@@ -30,6 +30,10 @@ class PerformanceSnapshotsTable
                     ->numeric()
                     ->suffix('%')
                     ->sortable(),
+                TextColumn::make('quality_score')
+                    ->numeric(decimalPlaces: 1)
+                    ->suffix('%')
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->since()

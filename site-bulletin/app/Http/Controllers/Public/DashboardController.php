@@ -11,6 +11,8 @@ use App\Models\Conversation;
 use App\Models\Department;
 use App\Models\DepartmentMetric;
 use App\Models\ManagerRelationship;
+use App\Models\PerformanceSnapshot;
+use App\Models\PerformanceSample;
 use App\Models\RoleChangeRequest;
 use App\Models\Ticket;
 use App\Models\User;
@@ -62,7 +64,9 @@ class DashboardController extends Controller
         $managerAttentionQueue = null;
         $managerTrendWindow = null;
         $managerScale = '7d';
+        $employeeScale = '7d';
         $employeeWorkToday = null;
+        $employeeOverview = null;
         $newsAnnouncements = collect();
         $unreadAnnouncementCount = 0;
         $highPriorityAnnouncementCount = 0;
@@ -122,12 +126,18 @@ class DashboardController extends Controller
                 ->count();
 
             if ($user->isEmployee()) {
+                $employeeScale = in_array($request->query('scale'), ['7d', '24h', '3h'], true)
+                    ? (string) $request->query('scale')
+                    : '7d';
+
                 $employeeWorkToday = $this->buildEmployeeWorkToday(
                     $user,
                     $snapshots,
                     $unreadAnnouncementCount,
                     $unreadConversationCount
                 );
+
+                $employeeOverview = $this->buildEmployeeOverview($user, $snapshots, $employeeWorkToday, $employeeScale);
             }
 
             if ($user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
@@ -272,6 +282,8 @@ class DashboardController extends Controller
             'managerTrendWindow' => $managerTrendWindow,
             'managerScale' => $managerScale,
             'employeeWorkToday' => $employeeWorkToday,
+            'employeeOverview' => $employeeOverview,
+            'employeeScale' => $employeeScale,
             'newsAnnouncements' => $newsAnnouncements,
             'unreadAnnouncementCount' => $unreadAnnouncementCount,
             'highPriorityAnnouncementCount' => $highPriorityAnnouncementCount,
@@ -293,6 +305,7 @@ class DashboardController extends Controller
             return null;
         }
 
+        $departmentUserIds = $this->departmentUserIds($departmentId);
         $observedTeamSize = User::query()
             ->where(function ($query) use ($departmentId) {
                 $query->where('primary_department_id', $departmentId)
@@ -305,63 +318,52 @@ class DashboardController extends Controller
         $shift = $this->resolveActiveShift($profile, now());
         $plannedTeamSize = max((int) ($profile['planned_headcount'] ?? 0), $observedTeamSize);
 
-        $activeEmployees = (int) max(1, round($plannedTeamSize * $this->seededFloat("active-employees-{$departmentId}-{$shift['code']}-{$shift['start']->toDateString()}", 0.82, 1.03)));
-        $shiftTargetUnits = (int) round($activeEmployees * $profile['target_units_per_hour'] * $shift['duration_hours']);
-
-        $progress = $shift['duration_hours'] > 0
-            ? max(0, min(1, $shift['elapsed_hours'] / $shift['duration_hours']))
-            : 0;
-
-        $performanceFactor = $this->buildPerformanceFactor($departmentId, $progress);
-        $actualUnits = (int) round($shiftTargetUnits * $progress * $performanceFactor);
-        $elapsedHoursForRate = max(0.5, $shift['elapsed_hours']);
-        $avgProductivity = round($actualUnits / max(1, ($activeEmployees * $elapsedHoursForRate)), 1);
-
-        $qualityFactor = $this->buildQualityFactor($departmentId, $progress);
-        $qualityScore = round(max(70, min(100, $profile['target_quality'] * $qualityFactor)), 1);
-
-        $productivityAchievementPct = $shiftTargetUnits > 0
-            ? round(($actualUnits / $shiftTargetUnits) * 100, 1)
-            : 0.0;
-        $qualityAchievementPct = $profile['target_quality'] > 0
-            ? round(($qualityScore / $profile['target_quality']) * 100, 1)
-            : 0.0;
-
-        $baseSeries = $departmentMetricTrend->values()->map(function (DepartmentMetric $metric, int $index) use ($departmentId, $profile, $departmentMetricTrend) {
-            $count = max(1, $departmentMetricTrend->count() - 1);
-            $position = $count > 0 ? ($index / $count) : 0;
-            $wave = sin(($position * M_PI) + 0.35);
-
-            $productivityFactor = 0.90 + ($wave * 0.08) + $this->seededFloat("daily-prod-{$departmentId}-{$metric->metric_date?->toDateString()}", -0.04, 0.05);
-            $qualityFactor = 0.97 + ($wave * 0.02) + $this->seededFloat("daily-quality-{$departmentId}-{$metric->metric_date?->toDateString()}", -0.015, 0.01);
-
-            $productivity = round(max(8, min(80, $profile['target_units_per_hour'] * $productivityFactor)), 1);
-            $quality = round(max(70, min(100, $profile['target_quality'] * $qualityFactor)), 1);
-
-            return [
-                'day' => $metric->metric_date?->format('D') ?? '-',
-                'productivity' => $productivity,
-                'quality' => $quality,
-                'timestamp' => $metric->metric_date?->copy() ?? now(),
-            ];
-        })->values();
-
         $targetProductivity = (float) $profile['target_units_per_hour'];
         $targetQuality = (float) $profile['target_quality'];
+        $seriesByScale = $this->buildSampleSeriesForUsers($departmentUserIds);
 
-        $seriesByScale = [
-            '7d' => $baseSeries->map(fn ($point) => [
-                'label' => (string) $point['day'],
-                'productivity' => (float) $point['productivity'],
-                'quality' => (float) $point['quality'],
-                'from_date' => $point['timestamp'] instanceof Carbon ? $point['timestamp']->toDateString() : null,
-                'to_date' => $point['timestamp'] instanceof Carbon ? $point['timestamp']->toDateString() : null,
-            ])->values(),
-            '24h' => $this->buildHourlySeries($departmentId, $profile, 8, 3),
-            '3h' => $this->buildHourlySeries($departmentId, $profile, 7, 0.5),
-        ];
+        if (collect($seriesByScale['7d'] ?? [])->isEmpty()) {
+            $baseSeries = $departmentMetricTrend->values()->map(function (DepartmentMetric $metric, int $index) use ($departmentId, $profile, $departmentMetricTrend) {
+                $count = max(1, $departmentMetricTrend->count() - 1);
+                $position = $count > 0 ? ($index / $count) : 0;
+                $wave = sin(($position * M_PI) + 0.35);
+
+                $productivityFactor = 0.90 + ($wave * 0.08) + $this->seededFloat("daily-prod-{$departmentId}-{$metric->metric_date?->toDateString()}", -0.04, 0.05);
+                $qualityFactor = 0.97 + ($wave * 0.02) + $this->seededFloat("daily-quality-{$departmentId}-{$metric->metric_date?->toDateString()}", -0.015, 0.01);
+
+                $productivity = round(max(8, min(80, $profile['target_units_per_hour'] * $productivityFactor)), 1);
+                $quality = round(max(70, min(100, $profile['target_quality'] * $qualityFactor)), 1);
+
+                return [
+                    'label' => $metric->metric_date?->format('D') ?? '-',
+                    'productivity' => $productivity,
+                    'quality' => $quality,
+                    'from_date' => $metric->metric_date?->toDateString(),
+                    'to_date' => $metric->metric_date?->toDateString(),
+                ];
+            })->values();
+
+            $seriesByScale = [
+                '7d' => $baseSeries,
+                '24h' => $this->buildHourlySeries($departmentId, $profile, 8, 3),
+                '3h' => $this->buildHourlySeries($departmentId, $profile, 7, 0.5),
+            ];
+        }
 
         $activeSeries = $seriesByScale[$scale] ?? $seriesByScale['7d'];
+        $currentPoint = collect($seriesByScale['24h'] ?? [])->last() ?: collect($seriesByScale['7d'] ?? [])->last();
+        $activeEmployees = max(1, $observedTeamSize);
+        $elapsedHoursForRate = max(0.5, $shift['elapsed_hours']);
+        $avgProductivity = round((float) ($currentPoint['productivity'] ?? $targetProductivity), 1);
+        $qualityScore = round((float) ($currentPoint['quality'] ?? $targetQuality), 1);
+        $shiftTargetUnits = (int) round($activeEmployees * $targetProductivity * $shift['duration_hours']);
+        $actualUnits = (int) round($avgProductivity * $activeEmployees * $elapsedHoursForRate);
+        $productivityAchievementPct = $targetProductivity > 0
+            ? round(($avgProductivity / $targetProductivity) * 100, 1)
+            : 0.0;
+        $qualityAchievementPct = $targetQuality > 0
+            ? round(($qualityScore / $targetQuality) * 100, 1)
+            : 0.0;
 
         return [
             'department_id' => $departmentId,
@@ -700,9 +702,36 @@ class DashboardController extends Controller
         $department = $user->primaryDepartment ?: $user->departments()->first();
         $profile = $this->resolveDepartmentProfile($department);
         $shift = $this->resolveActiveShift($profile, now());
+        $recentSamples = PerformanceSample::query()
+            ->where('user_id', $user->id)
+            ->where('recorded_at', '>=', now()->subHours(2))
+            ->orderBy('recorded_at')
+            ->get();
+
+        $currentWindow = $recentSamples->where('recorded_at', '>=', now()->subHour())->values();
+        $previousWindow = $recentSamples
+            ->where('recorded_at', '<', now()->subHour())
+            ->where('recorded_at', '>=', now()->subHours(2))
+            ->values();
 
         $latestSnapshot = $snapshots->first();
         $previousSnapshot = $snapshots->skip(1)->first();
+        $latestUnits = $currentWindow->isNotEmpty()
+            ? round((float) $currentWindow->avg('units_per_hour'), 1)
+            : ($latestSnapshot?->units_per_hour !== null ? round((float) $latestSnapshot->units_per_hour, 1) : null);
+        $previousUnits = $previousWindow->isNotEmpty()
+            ? round((float) $previousWindow->avg('units_per_hour'), 1)
+            : ($previousSnapshot?->units_per_hour !== null ? round((float) $previousSnapshot->units_per_hour, 1) : null);
+        $latestQuality = $currentWindow->isNotEmpty()
+            ? round((float) $currentWindow->avg('quality_score'), 1)
+            : ($latestSnapshot?->quality_score !== null
+                ? round((float) $latestSnapshot->quality_score, 1)
+                : ($latestSnapshot?->rank_percentile !== null ? round(max(0, min(100, 100 - (float) $latestSnapshot->rank_percentile)), 1) : null));
+        $previousQuality = $previousWindow->isNotEmpty()
+            ? round((float) $previousWindow->avg('quality_score'), 1)
+            : ($previousSnapshot?->quality_score !== null
+                ? round((float) $previousSnapshot->quality_score, 1)
+                : ($previousSnapshot?->rank_percentile !== null ? round(max(0, min(100, 100 - (float) $previousSnapshot->rank_percentile)), 1) : null));
 
         $openTickets = Ticket::query()
             ->with(['category:id,name', 'assignee:id,name', 'department:id,name'])
@@ -754,13 +783,13 @@ class DashboardController extends Controller
             'shift_end' => $shift['end'],
             'target_units_per_hour' => (float) ($profile['target_units_per_hour'] ?? 42),
             'target_quality_pct' => (float) ($profile['target_quality'] ?? 95),
-            'latest_units_per_hour' => $latestSnapshot?->units_per_hour,
-            'latest_rank_percentile' => $latestSnapshot?->rank_percentile,
-            'throughput_delta' => $latestSnapshot && $previousSnapshot
-                ? round(((float) $latestSnapshot->units_per_hour) - ((float) $previousSnapshot->units_per_hour), 1)
+            'latest_units_per_hour' => $latestUnits,
+            'latest_quality_score' => $latestQuality,
+            'throughput_delta' => $latestUnits !== null && $previousUnits !== null
+                ? round($latestUnits - $previousUnits, 1)
                 : null,
-            'rank_delta' => $latestSnapshot && $previousSnapshot
-                ? ((int) $previousSnapshot->rank_percentile) - ((int) $latestSnapshot->rank_percentile)
+            'quality_delta' => $latestQuality !== null && $previousQuality !== null
+                ? round($latestQuality - $previousQuality, 1)
                 : null,
             'open_ticket_count' => $openTickets->count(),
             'action_required_count' => $actionRequiredCount,
@@ -770,6 +799,165 @@ class DashboardController extends Controller
             'unread_message_count' => $unreadConversationCount,
             'focus_tickets' => $focusTickets,
         ];
+    }
+
+    protected function buildEmployeeOverview(User $user, $snapshots, ?array $employeeWorkToday, string $scale = '7d'): ?array
+    {
+        if (! $employeeWorkToday) {
+            return null;
+        }
+
+        $targetProductivity = (float) ($employeeWorkToday['target_units_per_hour'] ?? 42.0);
+        $targetQuality = (float) ($employeeWorkToday['target_quality_pct'] ?? 95.0);
+        $seriesByScale = $this->buildSampleSeriesForUsers([$user->id]);
+
+        if (empty($seriesByScale['7d']) || collect($seriesByScale['7d'])->isEmpty()) {
+            $seriesByScale['7d'] = collect($snapshots)
+                ->sortBy('week_start')
+                ->values()
+                ->map(function (PerformanceSnapshot $snapshot) {
+                    $quality = $snapshot->quality_score;
+
+                    if ($quality === null && $snapshot->rank_percentile !== null) {
+                        $quality = max(0, min(100, 100 - (float) $snapshot->rank_percentile));
+                    }
+
+                    return [
+                        'label' => $snapshot->week_start?->format('M j') ?? '-',
+                        'productivity' => (float) ($snapshot->units_per_hour ?? 0),
+                        'quality' => round((float) ($quality ?? 0), 1),
+                        'from_date' => $snapshot->week_start?->toDateString(),
+                        'to_date' => $snapshot->week_start?->toDateString(),
+                    ];
+                });
+        }
+
+        if (empty($seriesByScale['24h']) || collect($seriesByScale['24h'])->isEmpty()) {
+            $seriesByScale['24h'] = collect($seriesByScale['7d'])->take(-8)->values();
+        }
+
+        if (empty($seriesByScale['3h']) || collect($seriesByScale['3h'])->isEmpty()) {
+            $seriesByScale['3h'] = collect($seriesByScale['24h'])->take(-7)->values();
+        }
+
+        if (collect($seriesByScale['7d'])->isEmpty()) {
+            return null;
+        }
+
+        $activeSeries = $seriesByScale[$scale] ?? $seriesByScale['7d'];
+
+        return [
+            'target_productivity' => $targetProductivity,
+            'target_quality' => $targetQuality,
+            'series_by_scale' => $seriesByScale,
+            'series' => $activeSeries,
+            'active_scale' => $scale,
+            'peak_productivity' => round((float) $activeSeries->max('productivity'), 1),
+            'latest_quality' => round((float) ($activeSeries->last()['quality'] ?? 0), 1),
+            'best_quality' => round((float) $activeSeries->max('quality'), 1),
+        ];
+    }
+
+    protected function buildSampleSeriesForUsers(array $userIds): array
+    {
+        $userIds = collect($userIds)->filter()->unique()->values()->all();
+
+        if (empty($userIds)) {
+            return [
+                '7d' => collect(),
+                '24h' => collect(),
+                '3h' => collect(),
+            ];
+        }
+
+        $samples = PerformanceSample::query()
+            ->whereIn('user_id', $userIds)
+            ->where('recorded_at', '>=', now()->subDays(7))
+            ->orderBy('recorded_at')
+            ->get();
+
+        if ($samples->isEmpty()) {
+            return [
+                '7d' => collect(),
+                '24h' => collect(),
+                '3h' => collect(),
+            ];
+        }
+
+        $daily = $samples->groupBy(fn (PerformanceSample $sample) => $sample->recorded_at?->toDateString())
+            ->take(-7)
+            ->map(function ($group, $date) {
+                $day = Carbon::parse($date);
+
+                return [
+                    'label' => $day->format('D'),
+                    'productivity' => round((float) $group->avg('units_per_hour'), 1),
+                    'quality' => round((float) $group->avg('quality_score'), 1),
+                    'from_date' => $day->toDateString(),
+                    'to_date' => $day->toDateString(),
+                ];
+            })
+            ->values();
+
+        $last24 = $samples->where('recorded_at', '>=', now()->subHours(24))
+            ->groupBy(function (PerformanceSample $sample) {
+                $timestamp = $sample->recorded_at?->copy();
+
+                if (! $timestamp) {
+                    return null;
+                }
+
+                $hourBucket = (int) (floor($timestamp->hour / 3) * 3);
+
+                return $timestamp->copy()->setTime($hourBucket, 0)->format('Y-m-d H:i:s');
+            })
+            ->filter()
+            ->map(function ($group, $bucket) {
+                $time = Carbon::parse($bucket);
+
+                return [
+                    'label' => $time->format('H:i'),
+                    'productivity' => round((float) $group->avg('units_per_hour'), 1),
+                    'quality' => round((float) $group->avg('quality_score'), 1),
+                    'from_date' => $time->toDateString(),
+                    'to_date' => $time->toDateString(),
+                ];
+            })
+            ->values();
+
+        $last3 = $samples->where('recorded_at', '>=', now()->subHours(3))
+            ->groupBy(fn (PerformanceSample $sample) => $sample->recorded_at?->copy()?->startOfMinute()->format('Y-m-d H:i:s'))
+            ->filter()
+            ->map(function ($group, $bucket) {
+                $time = Carbon::parse($bucket);
+
+                return [
+                    'label' => $time->format('H:i'),
+                    'productivity' => round((float) $group->avg('units_per_hour'), 1),
+                    'quality' => round((float) $group->avg('quality_score'), 1),
+                    'from_date' => $time->toDateString(),
+                    'to_date' => $time->toDateString(),
+                ];
+            })
+            ->values();
+
+        return [
+            '7d' => $daily,
+            '24h' => $last24,
+            '3h' => $last3,
+        ];
+    }
+
+    protected function departmentUserIds(int $departmentId): array
+    {
+        return User::query()
+            ->where(function ($query) use ($departmentId) {
+                $query->where('primary_department_id', $departmentId)
+                    ->orWhereHas('departments', fn ($departmentQuery) => $departmentQuery
+                        ->where('departments.id', $departmentId));
+            })
+            ->pluck('id')
+            ->all();
     }
 
     protected function describeEmployeeTicketNextStep(Ticket $ticket): string

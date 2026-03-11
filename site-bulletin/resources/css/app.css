@@ -41,6 +41,32 @@
     transform-origin: center;
     animation: chart-pop 0.35s ease forwards;
   }
+
+  .dashboard-reveal {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: dashboard-fade-up 0.45s ease forwards;
+  }
+
+  .dashboard-reveal-delay-1 {
+    animation-delay: 0.08s;
+  }
+
+  .dashboard-reveal-delay-2 {
+    animation-delay: 0.16s;
+  }
+
+  .dashboard-reveal-delay-3 {
+    animation-delay: 0.24s;
+  }
+
+  .dashboard-reveal-delay-4 {
+    animation-delay: 0.32s;
+  }
+
+  .badge-pulse-soft {
+    animation: badge-pulse 1.8s ease-in-out infinite;
+  }
 }
 
 @keyframes chart-draw {
@@ -57,5 +83,21 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes dashboard-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
   }
 }

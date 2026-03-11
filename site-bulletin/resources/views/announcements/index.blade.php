@@ -201,10 +201,13 @@
             $priority = $announcement->priority ?? 'medium';
             $acknowledgement = $announcement->user_acknowledgement ?? null;
         @endphp
-        <article class="rounded-xl border px-5 py-4 shadow-sm {{ $isRead ? 'border-slate-200 bg-white' : 'border-blue-200 bg-blue-50' }}">
+        <article class="rounded-2xl border px-5 py-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md {{ $isRead ? 'border-slate-200 bg-white' : 'border-blue-200 bg-blue-50/70' }}">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-2">
-              <h2 class="text-base font-semibold text-slate-900">
+              <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                Site News
+              </span>
+              <h2 class="text-lg font-semibold text-slate-900">
                 <a href="{{ route('announcements.show', $announcement) }}" class="hover:underline">
                   {{ $announcement->title }}
                 </a>
@@ -226,10 +229,10 @@
           </div>
 
           @if ($announcement->body)
-            <p class="mt-2 text-sm text-slate-700">{{ $announcement->body }}</p>
+            <p class="mt-3 text-sm leading-6 text-slate-700">{{ \Illuminate\Support\Str::limit($announcement->body, 320) }}</p>
           @endif
 
-          <div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
             <p>
               From {{ $announcement->author->name ?? 'System' }}
               @if ($announcement->starts_at)
@@ -248,7 +251,7 @@
                 </span>
               @endif
               <a href="{{ route('announcements.show', $announcement) }}" class="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-700 hover:bg-slate-50">
-                Open
+                Read story
               </a>
             </div>
           </div>

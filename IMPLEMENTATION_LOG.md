@@ -3,6 +3,77 @@
 ## Purpose
 Track what changed, why it changed, and what remains, without overloading `PARITY_MATRIX.md`.
 
+## Block: Tab UX Review Matrix
+- Date: 2026-03-11
+- Scope: UX review artifact for first-level navigation and tab expectations across user roles.
+- Reason:
+  - The current app shell needs a clearer comparison against standard app conventions, the sample guide shell, and the Laravel implementation by role.
+  - A dedicated matrix was added to support review before navigation changes are implemented.
+- Validation evidence:
+  - Reviewed current shell in `site-bulletin/resources/views/layouts/app.blade.php`.
+  - Reviewed route availability in `site-bulletin/routes/web.php`.
+  - Reviewed sample shell in `Site Bulletin Implementation Guide/src/app/App.tsx`.
+  - Added `TAB_UX_COMPARISON_MATRIX.md` as a repo-level comparison artifact.
+
+## Block: Fixed Header And Profile Dropdown
+- Date: 2026-03-11
+- Scope: Desktop app-shell header and wide sidebar cleanup.
+- Reason:
+  - The authenticated top bar needed to stay fixed for easier access to account actions.
+  - The user requested a profile-picture style trigger near the top-right actions, with a dropdown similar to the reference shell.
+  - Wide desktop navigation was simplified by removing the always-visible dot markers from sidebar items.
+  - Header branding was expanded to include the site logo and product name on wide screens.
+  - Branding visibility was adjusted so the sidebar logo shows at the top of the page and the fixed header logo appears only after scrolling.
+- Validation evidence:
+  - Updated `site-bulletin/resources/views/layouts/app.blade.php`.
+  - Test command: `php artisan test tests/Feature/LayoutNavigationTest.php`
+
+## Block: Dashboard Hero Compression
+- Date: 2026-03-11
+- Scope: Top section of the authenticated dashboard landing page.
+- Reason:
+  - The original hero banner consumed too much vertical space and behaved more like a marketing panel than an operational dashboard header.
+  - The dashboard was updated to use a smaller operational summary strip with compact copy and quick actions so task-focused content appears earlier.
+- Validation evidence:
+  - Updated `site-bulletin/resources/views/dashboard/partials/content.blade.php`.
+  - Test command: `php artisan test tests/Feature/DashboardTrendPanelsTest.php`
+
+## Block: Figma Navigation And Dashboard Pass
+- Date: 2026-03-11
+- Scope: Figma-aligned shell navigation and dashboard information styling.
+- Reason:
+  - The active UX focus was narrowed to Figma-related improvements only.
+  - Primary navigation needed icon support, unread badge support, and a more prototype-like mobile bottom bar.
+  - Employee dashboard summary cards needed a cleaner label/value/context hierarchy with light motion and stronger visual anchors.
+- Validation evidence:
+  - Updated `TAB_UX_COMPARISON_MATRIX.md`.
+  - Updated `site-bulletin/resources/views/layouts/app.blade.php`.
+  - Added `site-bulletin/resources/views/components/nav-icon.blade.php`.
+  - Updated `site-bulletin/resources/views/dashboard/partials/my-work-today.blade.php`.
+  - Updated `site-bulletin/resources/css/app.css`.
+  - Test command: `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/DashboardTrendPanelsTest.php`
+
+## Block: Employee Performance Persistence And Trend Fix
+- Date: 2026-03-11
+- Scope: Employee performance data model and employee dashboard trend charts.
+- Reason:
+  - Employee quality was previously derived from rank percentile rather than stored as a real persisted metric.
+  - Employee `24h` and `3h` trend views were previously simulated rather than backed by stored intraday samples.
+  - Employee chart axis bounds needed correction so productivity target lines and lower quality values remain visible.
+- Validation evidence:
+  - Added `site-bulletin/database/migrations/2026_03_11_150000_add_quality_score_to_performance_snapshots_table.php`.
+  - Added `site-bulletin/database/migrations/2026_03_11_151000_create_performance_samples_table.php`.
+  - Added `site-bulletin/app/Models/PerformanceSample.php`.
+  - Updated `site-bulletin/app/Models/User.php`.
+  - Updated `site-bulletin/app/Models/PerformanceSnapshot.php`.
+  - Updated `site-bulletin/database/factories/PerformanceSnapshotFactory.php`.
+  - Updated `site-bulletin/database/seeders/DatabaseSeeder.php`.
+  - Updated `site-bulletin/app/Http/Controllers/Public/DashboardController.php`.
+  - Updated `site-bulletin/resources/views/dashboard/partials/trend-panels.blade.php`.
+  - Updated Filament performance snapshot form/table schema.
+  - Test command: `php artisan test tests/Feature/DashboardTrendPanelsTest.php`
+  - Seeder follow-up: replaced weekly employee performance snapshot `updateOrCreate` flow with bulk `upsert` to preserve idempotent seeding against the unique `(user_id, week_start)` key.
+
 ## Block: Product Direction
 - Date: 2026-03-10
 - Scope: Role-based use case framing and agent handoff context.
@@ -1653,3 +1724,36 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - `php artisan test --filter=DashboardTrendPanelsTest`
   - `php artisan test --filter=TicketFiltersTest`
 - Result: Passed.
+## 2026-03-11 - Unified performance sample source for dashboard charts and employee cards
+- Scope: `site-bulletin/app/Http/Controllers/Public/DashboardController.php`, `site-bulletin/resources/views/dashboard/partials/my-work-today.blade.php`, `site-bulletin/database/seeders/DatabaseSeeder.php`
+- Reason: employee dashboard cards and charts were reading different layers of mock data, and manager performance charts were still synthetic rather than aggregating from the same per-user sample stream. This made one user's displayed productivity and quality feel unsynchronized across views.
+- Change:
+  - made 15-minute `performance_samples` the seeded source of truth for user performance and quality across the last 6 weeks
+  - derived weekly `performance_snapshots` from those samples during seeding instead of maintaining an unrelated parallel dataset
+  - updated employee `My Work Today` cards to read recent sample windows for current throughput, quality score, and hour-over-hour deltas
+  - updated employee wording from snapshot/rank language to current sample-window language
+  - updated manager trend data to aggregate department-level performance and quality from the same per-user sample table, with fallback to the prior synthetic/metric path when tests or sparse fixtures do not seed samples
+- Validation:
+  - `php artisan migrate:fresh --seed`
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-11 - Announcement feed converted toward news-style updates
+- Scope: `site-bulletin/database/seeders/DatabaseSeeder.php`, `site-bulletin/resources/views/announcements/index.blade.php`, `site-bulletin/resources/views/dashboard/partials/content.blade.php`, `site-bulletin/resources/views/dashboard/partials/news-widget.blade.php`
+- Reason: announcement records and cards felt generic and low-signal, even though the app already had a clickable detail flow. The feed needed more concrete operational content and clearer news-like presentation.
+- Change:
+  - removed generic factory-seeded announcement filler and replaced it with a fixed set of site-relevant operational, transport, training, and department updates
+  - made dashboard and announcement-index cards read more like news items with stronger headlines, excerpts, metadata, and explicit read/open actions
+  - kept the existing announcement detail page and acknowledgement flow as the full-content destination
+- Validation:
+  - `php artisan db:seed`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/Announcements/AnnouncementReadFlowTest.php tests/Feature/Announcements/AnnouncementCreationPermissionsTest.php`
+
+## 2026-03-11 - Quick link category icons made category-specific
+- Scope: `site-bulletin/resources/views/dashboard/partials/content.blade.php`
+- Reason: the quick-link cards were using one generic icon for every category, which made the block feel repetitive and low-information.
+- Change:
+  - replaced the single reused category glyph with simple per-category icon mapping based on category name
+  - current mappings include megaphone for `Hot Topics`, briefcase for `Current Vacancies`, building for `My Site`, sparkles for `Diversity, Equity & Inclusion`, wrench for `Site Tools`, and people for `PxT` / HR-style categories
+- Validation:
+  - `php artisan view:clear`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php`

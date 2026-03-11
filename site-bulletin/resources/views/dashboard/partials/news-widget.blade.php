@@ -27,11 +27,24 @@
                 default => 'bg-blue-100 text-blue-700',
             };
           @endphp
-          <li class="rounded-lg border border-slate-200 px-4 py-3">
-            <div class="flex items-center justify-between gap-2">
-              <a href="{{ route('announcements.show', $announcement) }}" class="font-semibold text-slate-900 hover:underline">
-                {{ $announcement->title }}
-              </a>
+          <li class="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-4 transition hover:border-blue-200 hover:bg-white">
+            <div class="flex items-start justify-between gap-3">
+              <div class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                    News
+                  </span>
+                  <a href="{{ route('announcements.show', $announcement) }}" class="font-semibold text-slate-900 hover:text-blue-700 hover:underline">
+                    {{ $announcement->title }}
+                  </a>
+                </div>
+                <p class="text-xs text-slate-500">
+                  {{ $announcement->author->name ?? 'System' }} · {{ $announcement->updated_at?->diffForHumans() ?? 'recently' }}
+                </p>
+                @if ($announcement->body)
+                  <p class="text-sm leading-6 text-slate-600">{{ \Illuminate\Support\Str::limit($announcement->body, 120) }}</p>
+                @endif
+              </div>
               <div class="flex items-center gap-2">
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {{ $priorityClasses }}">
                   {{ $priority }}
@@ -42,17 +55,16 @@
                   </span>
                 @endunless
               </div>
+              </div>
             </div>
-            <p class="mt-1 text-xs text-slate-500">
-              {{ $announcement->author->name ?? 'System' }} · {{ $announcement->updated_at?->diffForHumans() ?? 'recently' }}
-            </p>
-            @if ($announcement->body)
-              <p class="mt-2 text-sm text-slate-600">{{ \Illuminate\Support\Str::limit($announcement->body, 140) }}</p>
-            @endif
+            <div class="mt-3 flex justify-end">
+              <a href="{{ route('announcements.show', $announcement) }}" class="text-xs font-semibold text-blue-600 hover:underline">
+                Open story
+              </a>
+            </div>
           </li>
         @endforeach
       </ul>
     @endif
   </section>
 @endauth
-

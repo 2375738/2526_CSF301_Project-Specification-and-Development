@@ -4,10 +4,9 @@
         ->values();
 
     $employeeMax = max(1, (int) $employeeTrend->max('units_per_hour'));
-    $employeeTarget = 42;
     $employeeBestRank = $employeeTrend->min('rank_percentile');
     $employeeLatestRank = $employeeTrend->last()?->rank_percentile;
-    $employeeQualityMax = 100;
+    $employeeOverview = $employeeOverview ?? null;
 
     $managerTrend = ($departmentMetricTrend ?? collect())->values();
     $managerMaxOpen = max(1, (int) $managerTrend->max('open_tickets'));
@@ -41,65 +40,168 @@
       <header class="flex items-center justify-between">
         <div>
           <h2 class="text-lg font-semibold text-slate-900">Employee Performance Trend</h2>
-          <p class="text-xs text-slate-500">Units per hour by week with target comparison</p>
+          <p class="text-xs text-slate-500">Productivity and quality charts with the same interaction model as the manager view.</p>
         </div>
       </header>
-      <div class="h-40 rounded-xl border border-slate-200 bg-slate-50 px-3 py-4">
-        <div class="flex h-full items-end gap-2">
-          @foreach ($employeeTrend as $point)
-            @php
-              $height = (int) round((($point->units_per_hour ?? 0) / $employeeMax) * 100);
-              $isBelowTarget = (int) ($point->units_per_hour ?? 0) < $employeeTarget;
-            @endphp
-            <div class="flex flex-1 flex-col items-center justify-end gap-2">
-              <div class="w-full rounded-t-md {{ $isBelowTarget ? 'bg-amber-500' : 'bg-blue-500' }}" style="height: {{ max(8, $height) }}%;"></div>
-              <span class="text-[10px] text-slate-500">{{ $point->week_start?->format('M j') }}</span>
+      @if ($employeeOverview && collect($employeeOverview['series'])->isNotEmpty())
+        @php
+          $employeeSeries = collect($employeeOverview['series'])->values();
+          $employeeTargetProductivity = (float) ($employeeOverview['target_productivity'] ?? 42);
+          $employeeTargetQuality = (float) ($employeeOverview['target_quality'] ?? 95);
+          $employeeMaxProd = max(55.0, (float) $employeeSeries->max('productivity') + 8.0, $employeeTargetProductivity + 8.0);
+          $employeeMinProd = max(0.0, min((float) floor(($employeeSeries->min('productivity') ?? 0) - 8.0), $employeeTargetProductivity - 10.0));
+          $employeeMaxQuality = 100.0;
+          $employeeMinQuality = max(0.0, min((float) floor(($employeeSeries->min('quality') ?? 80) - 8.0), $employeeTargetQuality - 12.0));
+          $employeeWidth = 640;
+          $employeeHeight = 230;
+          $employeePaddingX = 42;
+          $employeePaddingTop = 18;
+          $employeePaddingBottom = 26;
+          $employeePlotWidth = $employeeWidth - ($employeePaddingX * 2);
+          $employeePlotHeight = $employeeHeight - ($employeePaddingTop + $employeePaddingBottom);
+          $employeeCount = max(1, $employeeSeries->count());
+          $employeeStepX = $employeeCount > 1 ? ($employeePlotWidth / ($employeeCount - 1)) : 0;
+
+          $employeeCoords = function ($key, $minY, $maxY) use ($employeeSeries, $employeePaddingX, $employeePaddingTop, $employeePlotHeight, $employeeStepX) {
+              $range = max(1, $maxY - $minY);
+              return $employeeSeries->values()->map(function ($point, $index) use ($key, $range, $minY, $employeePaddingX, $employeePaddingTop, $employeePlotHeight, $employeeStepX) {
+                  $x = $employeePaddingX + ($index * $employeeStepX);
+                  $normalized = ((float) $point[$key] - $minY) / $range;
+                  $y = $employeePaddingTop + ($employeePlotHeight - ($normalized * $employeePlotHeight));
+                  return number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
+              })->implode(' ');
+          };
+
+          $employeeProdRange = max(1, $employeeMaxProd - $employeeMinProd);
+          $employeeQualityRange = max(1, $employeeMaxQuality - $employeeMinQuality);
+          $employeeProdTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetProductivity - $employeeMinProd) / $employeeProdRange) * $employeePlotHeight));
+          $employeeQualityTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetQuality - $employeeMinQuality) / $employeeQualityRange) * $employeePlotHeight));
+        @endphp
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 space-y-4">
+          <div class="flex items-center justify-between px-1">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">Performance Trend</h3>
+              <p class="text-[11px] text-slate-500">Quality vs Productivity Trend across the selected window.</p>
             </div>
-          @endforeach
-        </div>
-      </div>
-      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-slate-900">Quality vs Productivity Trend</h3>
-          <span class="text-xs text-slate-500">Rank-based quality index</span>
-        </div>
-        <div class="mt-3 grid gap-2">
-          @foreach ($employeeTrend as $point)
-            @php
-              $qualityIndex = $point->rank_percentile !== null ? max(0, min(100, 100 - (int) $point->rank_percentile)) : 0;
-              $productivityWidth = (int) round((($point->units_per_hour ?? 0) / $employeeMax) * 100);
-              $qualityWidth = (int) round(($qualityIndex / $employeeQualityMax) * 100);
-            @endphp
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-[11px] text-slate-500">
-                <span>{{ $point->week_start?->format('M j') }}</span>
-                <span>{{ $point->units_per_hour ?? 0 }} /hr · QI {{ $qualityIndex }}</span>
+            <div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 text-xs">
+              @foreach (['7d' => 'Last 7 days', '24h' => 'Last 24 hours', '3h' => 'Last 3 hours'] as $scaleKey => $scaleLabel)
+                <a
+                  href="{{ route('home', ['scale' => $scaleKey]) }}"
+                  class="rounded-md px-2 py-1 {{ ($employeeOverview['active_scale'] ?? '7d') === $scaleKey ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100' }}"
+                >
+                  {{ $scaleLabel }}
+                </a>
+              @endforeach
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div
+              class="rounded-lg border border-slate-200 bg-white p-3"
+              x-data="{ active: null, setActive(event, payload) { const rect = this.$el.getBoundingClientRect(); const tooltipWidth = 164; const edgePad = 10; let left = event.clientX - rect.left; const minLeft = edgePad + (tooltipWidth / 2); const maxLeft = rect.width - edgePad - (tooltipWidth / 2); if (rect.width <= (tooltipWidth + (edgePad * 2))) { left = rect.width / 2; } else { left = Math.min(Math.max(left, minLeft), maxLeft); } this.active = { ...payload, left, top: Math.max(18, event.clientY - rect.top - 10) }; } }"
+              x-on:mouseleave="active = null"
+            >
+              <div class="mb-2 flex items-center justify-between">
+                <p class="text-sm font-semibold text-blue-700">Productivity (units/hr)</p>
+                <p class="text-xs text-slate-500">Target: {{ number_format((float) ($employeeOverview['target_productivity'] ?? 42), 1) }}</p>
               </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div class="overflow-hidden rounded-full bg-slate-200">
-                  <div class="h-2 rounded-full bg-blue-500" style="width: {{ max(4, $productivityWidth) }}%;"></div>
-                </div>
-                <div class="overflow-hidden rounded-full bg-slate-200">
-                  <div class="h-2 rounded-full bg-emerald-500" style="width: {{ max(4, $qualityWidth) }}%;"></div>
+              <div class="relative">
+                <svg viewBox="0 0 {{ $employeeWidth }} {{ $employeeHeight }}" class="w-full">
+                  @foreach ([0, 0.25, 0.5, 0.75, 1] as $gridStep)
+                    @php
+                      $gridY = $employeePaddingTop + ($employeePlotHeight * $gridStep);
+                      $tickValue = number_format($employeeMaxProd - (($employeeMaxProd - $employeeMinProd) * $gridStep), 1);
+                    @endphp
+                    <line x1="{{ $employeePaddingX }}" y1="{{ number_format($gridY, 2, '.', '') }}" x2="{{ $employeePaddingX + $employeePlotWidth }}" y2="{{ number_format($gridY, 2, '.', '') }}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3 3" />
+                    <text x="{{ $employeePaddingX - 32 }}" y="{{ number_format($gridY + 3, 2, '.', '') }}" fill="#64748b" font-size="10">{{ $tickValue }}</text>
+                  @endforeach
+                  <line x1="{{ $employeePaddingX }}" y1="{{ $employeePaddingTop }}" x2="{{ $employeePaddingX }}" y2="{{ $employeePaddingTop + $employeePlotHeight }}" stroke="#cbd5e1" stroke-width="1" />
+                  <line x1="{{ $employeePaddingX }}" y1="{{ $employeePaddingTop + $employeePlotHeight }}" x2="{{ $employeePaddingX + $employeePlotWidth }}" y2="{{ $employeePaddingTop + $employeePlotHeight }}" stroke="#cbd5e1" stroke-width="1" />
+                  <line x1="{{ $employeePaddingX }}" y1="{{ number_format($employeeProdTargetY, 2, '.', '') }}" x2="{{ $employeePaddingX + $employeePlotWidth }}" y2="{{ number_format($employeeProdTargetY, 2, '.', '') }}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 4" />
+                  <text x="{{ $employeePaddingX + 6 }}" y="{{ number_format($employeeProdTargetY - 4, 2, '.', '') }}" fill="#b45309" font-size="10">Target</text>
+                  <polyline points="{{ $employeeCoords('productivity', $employeeMinProd, $employeeMaxProd) }}" fill="none" stroke="#2563eb" stroke-width="2.2" class="chart-line-animate" />
+                  @foreach ($employeeSeries as $index => $point)
+                    @php
+                      $x = $employeePaddingX + ($index * $employeeStepX);
+                      $y = $employeePaddingTop + ($employeePlotHeight - (((($point['productivity'] ?? 0) - $employeeMinProd) / $employeeProdRange) * $employeePlotHeight));
+                      $hoverWidth = $employeeCount > 1 ? max(18, ($employeePlotWidth / $employeeCount)) : $employeePlotWidth;
+                      $hoverX = $employeeCount > 1 ? ($x - ($hoverWidth / 2)) : $employeePaddingX;
+                    @endphp
+                    <rect x="{{ number_format($hoverX, 2, '.', '') }}" y="{{ number_format($employeePaddingTop, 2, '.', '') }}" width="{{ number_format($hoverWidth, 2, '.', '') }}" height="{{ number_format($employeePlotHeight, 2, '.', '') }}" fill="transparent"
+                      x-on:mouseenter="setActive($event, {label: '{{ $point['label'] }}', value: '{{ number_format((float) $point['productivity'], 1) }}', unit: 'units/hr'})"
+                      x-on:mousemove="setActive($event, {label: '{{ $point['label'] }}', value: '{{ number_format((float) $point['productivity'], 1) }}', unit: 'units/hr'})" />
+                    <circle cx="{{ number_format($x, 2, '.', '') }}" cy="{{ number_format($y, 2, '.', '') }}" r="3" fill="#2563eb" class="chart-point-animate" style="animation-delay: {{ number_format($index * 0.02, 2, '.', '') }}s"></circle>
+                    <text x="{{ number_format($x - 12, 2, '.', '') }}" y="{{ $employeeHeight - 6 }}" fill="#64748b" font-size="10">{{ $point['label'] }}</text>
+                  @endforeach
+                </svg>
+                <div x-show="active" x-cloak class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow" :style="`left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);`">
+                  <p class="font-semibold text-slate-900" x-text="active?.label"></p>
+                  <p class="text-blue-700"><span x-text="active?.value"></span> <span x-text="active?.unit"></span></p>
                 </div>
               </div>
             </div>
-          @endforeach
+
+            <div
+              class="rounded-lg border border-slate-200 bg-white p-3"
+              x-data="{ active: null, setActive(event, payload) { const rect = this.$el.getBoundingClientRect(); const tooltipWidth = 164; const edgePad = 10; let left = event.clientX - rect.left; const minLeft = edgePad + (tooltipWidth / 2); const maxLeft = rect.width - edgePad - (tooltipWidth / 2); if (rect.width <= (tooltipWidth + (edgePad * 2))) { left = rect.width / 2; } else { left = Math.min(Math.max(left, minLeft), maxLeft); } this.active = { ...payload, left, top: Math.max(18, event.clientY - rect.top - 10) }; } }"
+              x-on:mouseleave="active = null"
+            >
+              <div class="mb-2 flex items-center justify-between">
+                <p class="text-sm font-semibold text-emerald-700">Quality (%)</p>
+                <p class="text-xs text-slate-500">Target: {{ number_format((float) ($employeeOverview['target_quality'] ?? 95), 1) }}</p>
+              </div>
+              <div class="relative">
+                <svg viewBox="0 0 {{ $employeeWidth }} {{ $employeeHeight }}" class="w-full">
+                  @foreach ([0, 0.25, 0.5, 0.75, 1] as $gridStep)
+                    @php
+                      $gridY = $employeePaddingTop + ($employeePlotHeight * $gridStep);
+                      $tickValue = number_format($employeeMaxQuality - (($employeeMaxQuality - $employeeMinQuality) * $gridStep), 1);
+                    @endphp
+                    <line x1="{{ $employeePaddingX }}" y1="{{ number_format($gridY, 2, '.', '') }}" x2="{{ $employeePaddingX + $employeePlotWidth }}" y2="{{ number_format($gridY, 2, '.', '') }}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3 3" />
+                    <text x="{{ $employeePaddingX - 32 }}" y="{{ number_format($gridY + 3, 2, '.', '') }}" fill="#64748b" font-size="10">{{ $tickValue }}</text>
+                  @endforeach
+                  <line x1="{{ $employeePaddingX }}" y1="{{ $employeePaddingTop }}" x2="{{ $employeePaddingX }}" y2="{{ $employeePaddingTop + $employeePlotHeight }}" stroke="#cbd5e1" stroke-width="1" />
+                  <line x1="{{ $employeePaddingX }}" y1="{{ $employeePaddingTop + $employeePlotHeight }}" x2="{{ $employeePaddingX + $employeePlotWidth }}" y2="{{ $employeePaddingTop + $employeePlotHeight }}" stroke="#cbd5e1" stroke-width="1" />
+                  <line x1="{{ $employeePaddingX }}" y1="{{ number_format($employeeQualityTargetY, 2, '.', '') }}" x2="{{ $employeePaddingX + $employeePlotWidth }}" y2="{{ number_format($employeeQualityTargetY, 2, '.', '') }}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 4" />
+                  <text x="{{ $employeePaddingX + 6 }}" y="{{ number_format($employeeQualityTargetY - 4, 2, '.', '') }}" fill="#b45309" font-size="10">Target</text>
+                  <polyline points="{{ $employeeCoords('quality', $employeeMinQuality, $employeeMaxQuality) }}" fill="none" stroke="#10b981" stroke-width="2.2" style="stroke-dasharray:1000;stroke-dashoffset:1000;animation:chart-draw 1.2s ease .15s forwards;" />
+                  @foreach ($employeeSeries as $index => $point)
+                    @php
+                      $x = $employeePaddingX + ($index * $employeeStepX);
+                      $y = $employeePaddingTop + ($employeePlotHeight - (((($point['quality'] ?? 0) - $employeeMinQuality) / $employeeQualityRange) * $employeePlotHeight));
+                      $hoverWidth = $employeeCount > 1 ? max(18, ($employeePlotWidth / $employeeCount)) : $employeePlotWidth;
+                      $hoverX = $employeeCount > 1 ? ($x - ($hoverWidth / 2)) : $employeePaddingX;
+                    @endphp
+                    <rect x="{{ number_format($hoverX, 2, '.', '') }}" y="{{ number_format($employeePaddingTop, 2, '.', '') }}" width="{{ number_format($hoverWidth, 2, '.', '') }}" height="{{ number_format($employeePlotHeight, 2, '.', '') }}" fill="transparent"
+                      x-on:mouseenter="setActive($event, {label: '{{ $point['label'] }}', value: '{{ number_format((float) $point['quality'], 1) }}', unit: '%'})"
+                      x-on:mousemove="setActive($event, {label: '{{ $point['label'] }}', value: '{{ number_format((float) $point['quality'], 1) }}', unit: '%'})" />
+                    <circle cx="{{ number_format($x, 2, '.', '') }}" cy="{{ number_format($y, 2, '.', '') }}" r="3" fill="#10b981" class="chart-point-animate" style="animation-delay: {{ number_format(($index * 0.02) + 0.08, 2, '.', '') }}s"></circle>
+                    <text x="{{ number_format($x - 12, 2, '.', '') }}" y="{{ $employeeHeight - 6 }}" fill="#64748b" font-size="10">{{ $point['label'] }}</text>
+                  @endforeach
+                </svg>
+                <div x-show="active" x-cloak class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow" :style="`left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);`">
+                  <p class="font-semibold text-slate-900" x-text="active?.label"></p>
+                  <p class="text-emerald-700"><span x-text="active?.value"></span><span x-text="active?.unit"></span></p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      @endif
+
       <div class="grid gap-3 sm:grid-cols-2">
         <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
           <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Peak Throughput</p>
-          <p class="mt-1 text-2xl font-semibold text-blue-900">{{ $employeeTrend->max('units_per_hour') }} /hr</p>
-          <p class="text-xs text-blue-700">Highest week in current trend window</p>
+          <p class="mt-1 text-2xl font-semibold text-blue-900">{{ number_format((float) ($employeeOverview['peak_productivity'] ?? $employeeTrend->max('units_per_hour')), 1) }} /hr</p>
+          <p class="text-xs text-blue-700">Highest point in selected trend window</p>
         </div>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Rank Trend</p>
           <p class="mt-1 text-2xl font-semibold text-emerald-900">
-            {{ $employeeLatestRank ?? '-' }}%
+            {{ number_format((float) ($employeeOverview['latest_quality'] ?? (100 - ($employeeLatestRank ?? 100))), 1) }}%
           </p>
           <p class="text-xs text-emerald-700">
-            Lower is better. Best: {{ $employeeBestRank ?? '-' }}%
+            Quality view. Best in window: {{ number_format((float) ($employeeOverview['best_quality'] ?? (100 - ($employeeBestRank ?? 100))), 1) }}%
           </p>
         </div>
       </div>

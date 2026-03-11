@@ -18,6 +18,7 @@ use App\Models\TicketStatusChange;
 use App\Models\TicketAttachment;
 use App\Models\SLASetting;
 use App\Models\PerformanceSnapshot;
+use App\Models\PerformanceSample;
 use App\Models\ManagerRelationship;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -348,60 +349,94 @@ class DatabaseSeeder extends Seeder
 
         // Announcements
         $globalAuthor = $hr ?? $admin;
+        Announcement::query()->delete();
 
-        Announcement::factory()
-            ->state([
-                'is_pinned' => true,
-                'title' => 'Site upgrade this weekend',
-                'audience' => 'all',
-                'department_id' => null,
-                'author_id' => $globalAuthor->id,
-            ])
-            ->create();
-
-        Announcement::factory()->count(3)->state(function () use ($globalAuthor) {
-            return [
-                'audience' => 'all',
-                'department_id' => null,
-                'author_id' => $globalAuthor->id,
-            ];
-        })->create();
-
-        if ($inbound) {
-            Announcement::factory()->count(2)->state([
-                'audience' => 'department',
-                'department_id' => $inbound->id,
-                'author_id' => $mgr->id,
-            ])->create();
-        }
-
-        Announcement::updateOrCreate(
-            ['title' => 'Parking Rota Updated for This Week'],
+        $announcementSeed = [
             [
-                'body' => 'Parking rota and overflow guidance are now published in General Information links.',
+                'title' => 'Inbound dock scanner swap scheduled for Saturday night',
+                'body' => "IT will replace handheld scanners on docks 1 to 4 between 21:30 and 23:00 on Saturday.\n\nPlease return spare devices to the charging bay before the swap window starts. If your station loses a device after 21:30, raise an IT Support ticket instead of borrowing from another lane so the asset list stays accurate.\n\nExpected impact: short pauses during device handover, no full process stop.",
+                'audience' => 'all',
+                'department_id' => null,
+                'author_id' => $globalAuthor->id,
+                'is_pinned' => true,
+                'priority' => 'high',
+                'starts_at' => now()->subHours(3),
+                'ends_at' => now()->addDays(2),
+            ],
+            [
+                'title' => 'Shuttle route B running 15 minutes later on Friday morning',
+                'body' => "Transport support confirmed a delayed departure for route B because of road works near the east gate.\n\nPickup points remain the same. Day-shift associates using route B should allow extra travel time and notify their manager if the delay affects start-of-shift handover.",
                 'audience' => 'all',
                 'department_id' => null,
                 'author_id' => $globalAuthor->id,
                 'is_pinned' => false,
+                'priority' => 'medium',
+                'starts_at' => now()->subHours(10),
+                'ends_at' => now()->addDay(),
+            ],
+            [
+                'title' => 'Learning Loop 8.6 assigned for all process assistants this week',
+                'body' => "This week’s development item is Learning Loop 8.6: owning outcomes end-to-end.\n\nAssociates and process assistants should complete the module before Sunday 18:00. Managers will review completion in the next weekly check-in, so use the Knowledge area if you need the link again.",
+                'audience' => 'all',
+                'department_id' => null,
+                'author_id' => $hr->id,
+                'is_pinned' => false,
+                'priority' => 'medium',
+                'starts_at' => now()->subDay(),
+                'ends_at' => now()->addDays(4),
+            ],
+            [
+                'title' => 'Parking rota updated after overflow changes at Gate C',
+                'body' => "Overflow parking has moved to the far side of Gate C for the next seven days.\n\nPlease check the latest parking rota before arriving on site. Security will redirect vehicles parked in the old overflow lane after 09:30 each day.",
+                'audience' => 'all',
+                'department_id' => null,
+                'author_id' => $globalAuthor->id,
+                'is_pinned' => false,
+                'priority' => 'low',
                 'starts_at' => now()->subHours(6),
                 'ends_at' => now()->addDays(6),
-                'priority' => 'medium',
-            ]
-        );
-
-        Announcement::updateOrCreate(
-            ['title' => 'Shift Start Reminder (Days and Nights)'],
+            ],
             [
-                'body' => 'Day shift starts at 10:00. Night shift starts at 18:30. Please arrive 10 minutes early for handover.',
-                'audience' => 'all',
-                'department_id' => null,
-                'author_id' => $globalAuthor->id,
+                'title' => 'Inbound quality checks tightened on pallet labels for late vendor loads',
+                'body' => "Inbound teams should pause and re-check pallet labels arriving from late vendor loads after 18:00.\n\nWe saw three mismatched labels during the last night-shift intake. Use the usual escalation path if ASN detail does not match the label in hand. Do not move the pallet forward until the mismatch is resolved.",
+                'audience' => 'department',
+                'department_id' => $inbound?->id,
+                'author_id' => $mgr->id,
+                'is_pinned' => true,
+                'priority' => 'urgent',
+                'starts_at' => now()->subHours(2),
+                'ends_at' => now()->addDays(3),
+            ],
+            [
+                'title' => 'Weekend overtime sign-up open for inbound receive',
+                'body' => "Additional inbound receive coverage is available for Saturday and Sunday day shift.\n\nIf you want overtime, reply in Messages to your area manager before Friday 12:00. Priority will go to associates already trained on dock unload and receive staging.",
+                'audience' => 'department',
+                'department_id' => $inbound?->id,
+                'author_id' => $mgr->id,
                 'is_pinned' => false,
-                'starts_at' => now()->subDay(),
-                'ends_at' => now()->addDays(5),
-                'priority' => 'low',
-            ]
-        );
+                'priority' => 'medium',
+                'starts_at' => now()->subHours(18),
+                'ends_at' => now()->addDays(2),
+            ],
+            [
+                'title' => 'Managers: submit shift staffing gaps before 16:00',
+                'body' => "Ops and department managers should log today’s staffing gaps before 16:00 so support planning can finalize weekend coverage.\n\nInclude the affected area, required headcount, and whether the gap can be covered by cross-training.",
+                'audience' => 'managers',
+                'department_id' => null,
+                'author_id' => $admin->id,
+                'is_pinned' => false,
+                'priority' => 'high',
+                'starts_at' => now()->subHours(5),
+                'ends_at' => now()->addDay(),
+            ],
+        ];
+
+        foreach ($announcementSeed as $announcementData) {
+            Announcement::updateOrCreate(
+                ['title' => $announcementData['title']],
+                $announcementData + ['is_active' => true]
+            );
+        }
 
         KnowledgeSnippet::updateOrCreate(
             ['title' => 'Scanner reset steps'],
@@ -701,23 +736,70 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // Performance snapshots (6 weeks for each user)
-        foreach (User::all() as $u) {
-            $monday = Carbon::now()->startOfWeek(Carbon::MONDAY);
-            for ($i = 5; $i >= 0; $i--) {
-                $week = (clone $monday)->subWeeks($i);
+        PerformanceSnapshot::query()->delete();
+        PerformanceSample::query()->delete();
 
-                PerformanceSnapshot::updateOrCreate(
-                    [
-                        'user_id' => $u->id,
-                        'week_start' => $week->toDateString(),
-                    ],
-                    [
-                        'units_per_hour' => rand(80, 150),
-                        'rank_percentile' => rand(5, 98),
-                    ]
-                );
+        // Performance samples are the source of truth. Weekly snapshots are derived from them.
+        foreach (User::all() as $u) {
+            $profileDepartment = $u->primaryDepartment ?: $u->departments()->first();
+            $targetUnits = (float) ($profileDepartment?->target_units_per_hour ?: 42.0);
+            $targetQuality = (float) ($profileDepartment?->target_quality_pct ?: 95.0);
+            $samples = [];
+            $sampleStart = now()->subWeeks(6)->startOfMinute()->setMinute((int) (floor(now()->subWeeks(6)->minute / 15) * 15))->setSecond(0);
+            $sampleCount = 6 * 7 * 24 * 4;
+
+            foreach (range(0, $sampleCount) as $offset) {
+                $recordedAt = $sampleStart->copy()->addMinutes($offset * 15);
+                $progress = $sampleCount > 0 ? ($offset / $sampleCount) : 0;
+                $hourFraction = ((int) $recordedAt->format('H') + ((int) $recordedAt->format('i') / 60)) / 24;
+                $dailyWave = sin(($hourFraction * M_PI * 2) - 0.8);
+                $weeklyWave = sin((((int) $recordedAt->dayOfWeekIso / 7) * M_PI * 2) + ($u->id % 5));
+                $productivityFactor = 0.92
+                    + ($dailyWave * 0.10)
+                    + ($weeklyWave * 0.05)
+                    + (($this->seededRatio("sample-{$u->id}-{$recordedAt->format('YmdHi')}-uph") - 0.5) * 0.12);
+                $qualityFactor = 0.985
+                    + ($dailyWave * 0.015)
+                    + ($weeklyWave * 0.01)
+                    + (($this->seededRatio("sample-{$u->id}-{$recordedAt->format('YmdHi')}-quality") - 0.5) * 0.05);
+
+                $samples[] = [
+                    'user_id' => $u->id,
+                    'recorded_at' => $recordedAt,
+                    'units_per_hour' => round(max(8, min(180, $targetUnits * $productivityFactor)), 1),
+                    'quality_score' => round(max(70, min(100, $targetQuality * $qualityFactor)), 1),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
             }
+
+            PerformanceSample::upsert($samples, ['user_id', 'recorded_at'], ['units_per_hour', 'quality_score', 'updated_at']);
+
+            $snapshotRows = collect($samples)
+                ->groupBy(fn (array $sample) => Carbon::parse($sample['recorded_at'])->startOfWeek(Carbon::MONDAY)->toDateString())
+                ->map(function ($group, $weekStart) use ($u) {
+                    $avgUnits = round((float) collect($group)->avg('units_per_hour'));
+                    $avgQuality = round((float) collect($group)->avg('quality_score'), 1);
+                    $rankPercentile = (int) round(max(1, min(99, 100 - $avgQuality)));
+
+                    return [
+                        'user_id' => $u->id,
+                        'week_start' => $weekStart,
+                        'units_per_hour' => (int) $avgUnits,
+                        'rank_percentile' => $rankPercentile,
+                        'quality_score' => $avgQuality,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            PerformanceSnapshot::upsert(
+                $snapshotRows,
+                ['user_id', 'week_start'],
+                ['units_per_hour', 'rank_percentile', 'quality_score', 'updated_at']
+            );
         }
 
         // Conversations & Messages
@@ -900,5 +982,10 @@ class DatabaseSeeder extends Seeder
         }
 
         return null;
+    }
+
+    private function seededRatio(string $key): float
+    {
+        return ((float) sprintf('%u', crc32($key))) / 4294967295;
     }
 }

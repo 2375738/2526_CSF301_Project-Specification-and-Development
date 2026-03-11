@@ -21,6 +21,7 @@ class PerformanceSnapshotFactory extends Factory
             'week_start' => \Illuminate\Support\Carbon::now()->startOfWeek()->subWeeks(fake()->numberBetween(0, 10)),
             'units_per_hour' => fake()->numberBetween(60, 170),
             'rank_percentile' => fake()->numberBetween(1, 100),
+            'quality_score' => fake()->randomFloat(1, 75, 99.5),
         ];
     }
 }

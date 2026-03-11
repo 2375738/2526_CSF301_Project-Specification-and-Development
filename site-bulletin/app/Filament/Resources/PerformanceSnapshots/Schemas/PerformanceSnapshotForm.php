@@ -31,6 +31,12 @@ class PerformanceSnapshotForm
                     ->minValue(0)
                     ->maxValue(100)
                     ->suffix('%'),
+                TextInput::make('quality_score')
+                    ->nullable()
+                    ->numeric()
+                    ->minValue(0)
+                    ->maxValue(100)
+                    ->suffix('%'),
             ]);
     }
 }

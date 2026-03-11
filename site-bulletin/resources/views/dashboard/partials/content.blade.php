@@ -5,48 +5,84 @@
     $snapshotCount = $snapshots->count();
     $messagePreview = $messagePreview ?? collect();
     $unreadConversationCount = $unreadConversationCount ?? 0;
+    $isEmployeeDashboard = auth()->check() && auth()->user()->isEmployee() && ! empty($employeeWorkToday);
+
+    $categoryIconSvg = function ($categoryName) {
+        $name = \Illuminate\Support\Str::of((string) $categoryName)->lower();
+
+        if ($name->contains('hot topics')) {
+            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.25 4.5a.75.75 0 011.28-.53l3.75 3.75a.75.75 0 01.22.53v3.5a.75.75 0 01-.22.53l-3.75 3.75a.75.75 0 01-1.28-.53v-2.2l-4.13-.83a1.75 1.75 0 01-1.37-1.71V9.24c0-.83.58-1.55 1.39-1.72l4.11-.81V4.5z" /><path d="M4.75 8.75A1.75 1.75 0 003 10.5v.5a1.75 1.75 0 001.75 1.75h.75v-4h-.75z" /></svg>';
+        }
+
+        if ($name->contains('vacancies')) {
+            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.75A1.75 1.75 0 018.75 3h2.5A1.75 1.75 0 0113 4.75V6h2.25A1.75 1.75 0 0117 7.75v5.5A1.75 1.75 0 0115.25 15H4.75A1.75 1.75 0 013 13.25v-5.5A1.75 1.75 0 014.75 6H7V4.75zM8.5 6h3V4.75a.25.25 0 00-.25-.25h-2.5a.25.25 0 00-.25.25V6z" /></svg>';
+        }
+
+        if ($name->contains('my site')) {
+            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4.75 2.5A1.75 1.75 0 003 4.25v11.5C3 16.44 3.56 17 4.25 17h11.5c.69 0 1.25-.56 1.25-1.25v-8.5a.75.75 0 00-.22-.53l-3.5-3.5A.75.75 0 0012.75 3h-8zM6 6.25A.75.75 0 016.75 5.5h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016 6.25zm0 3A.75.75 0 016.75 8.5h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016 9.25zm0 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016 12.25zm5-6a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0111 6.25zm0 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75zm0 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75z" /></svg>';
+        }
+
+        if ($name->contains('diversity') || $name->contains('equity') || $name->contains('inclusion')) {
+            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2.5a.75.75 0 01.72.54l1.02 3.32 3.32 1.02a.75.75 0 010 1.44l-3.32 1.02-1.02 3.32a.75.75 0 01-1.44 0l-1.02-3.32-3.32-1.02a.75.75 0 010-1.44l3.32-1.02 1.02-3.32A.75.75 0 0110 2.5z" /><path d="M15.5 12.5a.75.75 0 01.72.54l.34 1.1 1.1.34a.75.75 0 010 1.44l-1.1.34-.34 1.1a.75.75 0 01-1.44 0l-.34-1.1-1.1-.34a.75.75 0 010-1.44l1.1-.34.34-1.1a.75.75 0 01.72-.54zM4.5 12.75a.75.75 0 01.72.54l.2.65.65.2a.75.75 0 010 1.44l-.65.2-.2.65a.75.75 0 01-1.44 0l-.2-.65-.65-.2a.75.75 0 010-1.44l.65-.2.2-.65a.75.75 0 01.72-.54z" /></svg>';
+        }
+
+        if ($name->contains('site tools')) {
+            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.62 2.96a4.5 4.5 0 00-5.67 5.67L2.72 11.87a1.75 1.75 0 102.47 2.47l3.24-3.23a4.5 4.5 0 005.67-5.67l-2.12 2.12a1.5 1.5 0 11-2.12-2.12l2.12-2.12z" /></svg>';
+        }
+
+        if ($name->contains('pxt') || $name->contains('hr')) {
+            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.5 8.25a2.75 2.75 0 100-5.5 2.75 2.75 0 000 5.5zM13.5 9.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zM2.5 15.25A3.75 3.75 0 016.25 11.5h.5A3.75 3.75 0 0110.5 15.25V16H2.5v-.75zM11.5 16v-.75c0-1.06-.34-2.04-.91-2.84a3.24 3.24 0 012.16-.81h.5A3.75 3.75 0 0117 15.25V16h-5.5z" /></svg>';
+        }
+
+        return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 4A2.25 2.25 0 002 6.25v7.5A2.25 2.25 0 004.25 16h11.5A2.25 2.25 0 0018 13.75v-7.5A2.25 2.25 0 0015.75 4H4.25zM5.5 8.25A.75.75 0 016.25 7.5h4.5a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75zm0 3a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg>';
+    };
 @endphp
 
 <div class="space-y-10">
-  <section class="relative overflow-hidden rounded-3xl border border-slate-900/10 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-8 py-10 text-white shadow-xl">
-    <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.22),_transparent_70%)] sm:block"></div>
-    <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-      <div class="max-w-xl">
-        <p class="text-sm uppercase tracking-[0.2em] text-slate-300">Site Bulletin</p>
-        <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Welcome back{{ auth()->check() ? ', ' . auth()->user()->name : '' }} to your operations hub
-        </h1>
-        <p class="mt-3 text-sm text-slate-200">
-          Monitor announcements, jump to key resources, and keep an eye on recent performance snapshots in one place.
-        </p>
-      </div>
-      @auth
-        <div class="flex flex-wrap gap-3">
-          <a href="{{ route('tickets.index') }}" class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/30 hover:bg-white hover:text-slate-900">
-            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M9.25 3a.75.75 0 00-1.5 0v2.5H5.25a.75.75 0 000 1.5H7.75V9.5a.75.75 0 001.5 0V7h2.5a.75.75 0 000-1.5H9.25z" />
-              <path d="M16.5 5A1.5 1.5 0 0118 6.5v9A1.5 1.5 0 0116.5 17h-13A1.5 1.5 0 012 15.5v-9A1.5 1.5 0 013.5 5h13z" />
-            </svg>
-            View My Tasks
-          </a>
-          @if (auth()->user()->isEmployee())
-            <a href="{{ route('tickets.create') }}" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-100">
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M10 3a.75.75 0 01.75.75V9.25h5.5a.75.75 0 010 1.5h-5.5v5.5a.75.75 0 01-1.5 0v-5.5H3.25a.75.75 0 010-1.5h5.5V3.75A.75.75 0 0110 3z" />
-              </svg>
-              Report an Issue
-            </a>
-          @endif
-          <a href="{{ route('profile.edit') }}" class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/30 hover:bg-white hover:text-slate-900">
-            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M10 2a4 4 0 110 8 4 4 0 010-8zM4 16a6 6 0 1112 0v1a1 1 0 01-1 1H5a1 1 0 01-1-1v-1z" />
-            </svg>
-            Edit Profile
-          </a>
+  @if (! $isEmployeeDashboard)
+    <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-6 py-6 text-white shadow-lg">
+      <div class="absolute inset-y-0 right-0 hidden w-1/4 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.16),_transparent_72%)] lg:block"></div>
+      <div class="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div class="max-w-3xl">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-300">Operations Overview</p>
+          <div class="mt-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:gap-4">
+            <h1 class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              {{ auth()->check() ? 'Good to see you, ' . auth()->user()->name : 'Welcome to Site Bulletin' }}
+            </h1>
+            @auth
+              <p class="text-sm text-slate-300">
+                @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
+                  Team visibility, queue health, and unread updates in one place.
+                @else
+                  Site updates, resources, and recent activity in one place.
+                @endif
+              </p>
+            @endauth
+          </div>
+          <p class="mt-3 max-w-2xl text-sm text-slate-300">
+            Start with the highest-priority work, then move into updates, tickets, and performance detail below.
+          </p>
         </div>
-      @endauth
-    </div>
-  </section>
+        @auth
+          <div class="flex flex-wrap gap-3">
+            <a href="{{ route('tickets.index') }}" class="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/25 hover:bg-white hover:text-slate-900">
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M9.25 3a.75.75 0 00-1.5 0v2.5H5.25a.75.75 0 000 1.5H7.75V9.5a.75.75 0 001.5 0V7h2.5a.75.75 0 000-1.5H9.25z" />
+                <path d="M16.5 5A1.5 1.5 0 0118 6.5v9A1.5 1.5 0 0116.5 17h-13A1.5 1.5 0 012 15.5v-9A1.5 1.5 0 013.5 5h13z" />
+              </svg>
+              View Tasks
+            </a>
+            <a href="{{ route('messages.index') }}" class="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/25 hover:bg-white hover:text-slate-900">
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M2 5.75A1.75 1.75 0 013.75 4h12.5A1.75 1.75 0 0118 5.75v7.5A1.75 1.75 0 0116.25 15H6.31l-2.78 2.29A.75.75 0 012 16.71V5.75z" />
+              </svg>
+              Open Messages
+            </a>
+          </div>
+        @endauth
+      </div>
+    </section>
+  @endif
 
   @include('dashboard.partials.my-work-today', [
       'employeeWorkToday' => $employeeWorkToday ?? null,
@@ -111,12 +147,14 @@
         Nothing to share yet. Check back soon for site updates.
       </div>
     @else
-      <div class="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div class="grid gap-4 lg:grid-cols-2">
         @foreach ($announcements as $announcement)
-          <article class="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
-            <div class="space-y-2">
+          <article class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+            <div class="space-y-3">
               <div class="flex flex-wrap items-center gap-2">
-                <h3 class="text-base font-semibold text-slate-900">{{ $announcement->title }}</h3>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                  News Update
+                </span>
                 @if ($announcement->is_pinned)
                   <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-medium text-amber-700">
                     <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -136,6 +174,14 @@
                   </span>
                 @endif
               </div>
+              <div class="space-y-2">
+                <h3 class="text-lg font-semibold leading-tight text-slate-900">
+                  <a href="{{ route('announcements.show', $announcement) }}" class="hover:text-blue-700 hover:underline">
+                    {{ $announcement->title }}
+                  </a>
+                </h3>
+                <p class="text-sm leading-6 text-slate-600">{{ \Illuminate\Support\Str::limit($announcement->body, 180) }}</p>
+              </div>
               @if ($announcement->starts_at || $announcement->ends_at)
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
                   @if ($announcement->starts_at)
@@ -149,12 +195,12 @@
                   @endif
                 </p>
               @endif
-              @if ($announcement->body)
-                <p class="text-sm leading-relaxed text-slate-600">{{ \Illuminate\Support\Str::limit($announcement->body, 260) }}</p>
-              @endif
-            </div>
-            <div class="flex items-center gap-3 text-xs text-slate-400">
-              <span>Updated {{ $announcement->updated_at?->diffForHumans() ?? 'recently' }}</span>
+              <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <span>{{ $announcement->author->name ?? 'System' }} · Updated {{ $announcement->updated_at?->diffForHumans() ?? 'recently' }}</span>
+                <a href="{{ route('announcements.show', $announcement) }}" class="font-semibold text-blue-600 group-hover:text-blue-700">
+                  Read update
+                </a>
+              </div>
             </div>
           </article>
         @endforeach
@@ -174,6 +220,9 @@
     @else
       <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         @foreach ($categories as $category)
+          @php
+              $iconSvg = $categoryIconSvg($category->name);
+          @endphp
           <div class="flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between">
               <div>
@@ -181,9 +230,7 @@
                 <h3 class="text-lg font-semibold text-slate-900">{{ $category->name }}</h3>
               </div>
               <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/5 text-slate-600">
-                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M3.105 3.553A1.5 1.5 0 014.582 2.5h10.836a1.5 1.5 0 011.477 1.053l1.642 5.132a1.5 1.5 0 01-1.43 1.964H2.893a1.5 1.5 0 01-1.43-1.964l1.642-5.132zM2.5 12.75A1.75 1.75 0 014.25 11h11.5a1.75 1.75 0 011.75 1.75v1.5A2.75 2.75 0 0114.75 17h-9.5A2.75 2.75 0 012.5 15.25v-2.5z" clip-rule="evenodd" />
-                </svg>
+                {!! $iconSvg !!}
               </span>
             </div>
             <div class="flex flex-wrap items-center gap-2">

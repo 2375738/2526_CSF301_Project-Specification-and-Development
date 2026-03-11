@@ -80,6 +80,11 @@ class User extends Authenticatable
         return $this->hasMany(PerformanceSnapshot::class);
     }
 
+    public function performanceSamples(): HasMany
+    {
+        return $this->hasMany(PerformanceSample::class);
+    }
+
     public function primaryDepartment(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'primary_department_id');
