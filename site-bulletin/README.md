@@ -1,59 +1,175 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Site Bulletin
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Overview
+Site Bulletin is a Laravel-based internal operations portal that simulates the communication, ticketing, analytics, and governance workflows of a fulfillment-centre environment. It is the primary implementation in this repository and the production behavior source of truth.
 
-## About Laravel
+The app supports role-based experiences for:
+- `employee`
+- `manager`
+- `ops_manager`
+- `hr`
+- `admin`
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Core Functionality
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Dashboard
+- Role-aware dashboard layouts for employees and leadership users.
+- Employee view includes:
+  - `My Work Today`
+  - performance and quality trend charts
+  - unread announcement/message summaries
+  - ticket focus and shift context
+- Manager view includes:
+  - department operational performance
+  - attention queue
+  - SLA health
+  - breach drilldown
+  - ticket type breakdown
+  - benchmark comparison
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Performance Simulation
+- Employee productivity and quality are stored as deterministic 15-minute `performance_samples`.
+- Weekly `performance_snapshots` are derived from those samples.
+- Dashboard trend windows use the same base source:
+  - `Last 7 days` = daily aggregation
+  - `Last 24 hours` = intraday aggregation
+  - `Last 3 hours` = short-window 15-minute points
+- Demo data can be refreshed to current local time with:
+  - `php artisan demo:backfill-ops-data`
 
-## Learning Laravel
+### Announcements
+- Audience targeting for `all`, department-scoped, and leadership-focused content.
+- Priority levels with unread and high-priority visibility.
+- Read tracking and drill-down detail pages.
+- Dashboard news widgets and announcement center views.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Messaging
+- Messenger-style inbox and conversation UI.
+- Direct, department, and announcement-linked conversations.
+- Unread tracking and role-aware creation permissions.
+- Mobile drill-in thread behavior with back navigation.
+- File attachments and inline image previews.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Ticketing and SLA
+- Ticket reporting for operational, HR, and support scenarios.
+- On-behalf ticket creation for leadership roles.
+- Status tracking with status-change history.
+- SLA evaluation for first response and active resolution time.
+- Simulated rolling SLA activity for realistic demo dashboards.
 
-## Laravel Sponsors
+### Governance
+- Audit and governance activity feeds.
+- Role change requests and approval workflow.
+- Governance hub and policy-related navigation.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Quick Links and Knowledge
+- Quick-link categories seeded from `data/cwl1informationportal/`.
+- Role-aware resource visibility.
+- Knowledge and portal-reference areas aligned with the implementation guide.
 
-### Premium Partners
+## Demo Accounts
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@example.com` | `password` |
+| Manager | `manager@example.com` | `password` |
+| HR | `hr@example.com` | `password` |
+| Employee | `employee@example.com` | `password` |
 
-## Contributing
+## Local Setup
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Prerequisites
+- PHP 8.2+
+- Composer
+- Node.js and npm
+- SQLite, MySQL, or PostgreSQL
 
-## Code of Conduct
+### Install
+```bash
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Database
+If you want a fresh local environment:
+```bash
+php artisan migrate:fresh --seed
+```
 
-## Security Vulnerabilities
+If you already have a local database and only need current demo data:
+```bash
+php artisan migrate
+php artisan demo:backfill-ops-data --refresh
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Run
+Start the backend:
+```bash
+php artisan serve --host=localhost --port=8000
+```
 
-## License
+Start the frontend dev server in another terminal:
+```bash
+npm run dev
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Development URLs normally are:
+- app: `http://localhost:8000`
+- Vite assets: `http://localhost:5173`
+
+### Production-style assets
+If you do not want Vite dev mode:
+```bash
+npm run build
+```
+
+## Testing
+Run the full Laravel test suite:
+```bash
+php artisan test
+```
+
+Useful focused suites:
+```bash
+php artisan test tests/Feature/Messaging
+php artisan test tests/Feature/DashboardTrendPanelsTest.php
+php artisan test tests/Feature/Analytics
+```
+
+## Scheduled Jobs
+For realistic local automation, Laravel scheduler should run:
+```bash
+php artisan schedule:run
+```
+
+Relevant scheduled commands include:
+- `demo:backfill-ops-data`
+- `tickets:recalculate-sla`
+- `analytics:recalculate-departments`
+- `analytics:send-digest`
+
+For a normal cron-based setup:
+```bash
+* * * * * php /path/to/site-bulletin/artisan schedule:run
+```
+
+## Demo Data Model
+
+### Performance
+- `performance_samples`: 15-minute base source of truth
+- `performance_snapshots`: weekly derived rollups
+
+### SLA
+- simulated ticket activity uses deterministic `simulation_key` records
+- status-change history drives SLA calculations
+- department metrics are recalculated from the ticket/message domain
+
+## Repository Context
+- Laravel app: [`site-bulletin/`](c:\Users\kadet\Documents\2526_CSF301_Project Specification and Development\site-bulletin)
+- Seeder reference data: [`data/cwl1informationportal/`](c:\Users\kadet\Documents\2526_CSF301_Project Specification and Development\data\cwl1informationportal)
+
+## Notes
+- The repository root only keeps governance and repo-level coordination files.
+- Product-level documentation now lives here in `site-bulletin/README.md`.

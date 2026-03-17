@@ -40,11 +40,60 @@
 
 <div class="space-y-10">
   @if (! $isEmployeeDashboard)
-    <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-6 py-6 text-white shadow-lg">
-      <div class="absolute inset-y-0 right-0 hidden w-1/4 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.16),_transparent_72%)] lg:block"></div>
+    @php
+        $isGuestLanding = ! auth()->check();
+        $heroClasses = $isGuestLanding
+            ? 'border-slate-200 bg-gradient-to-r from-slate-800 via-slate-700 to-blue-800 text-white'
+            : 'border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 text-white';
+        $heroAccentClasses = $isGuestLanding
+            ? 'bg-[radial-gradient(circle_at_top,_rgba(191,219,254,0.24),_transparent_72%)]'
+            : 'bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.16),_transparent_72%)]';
+    @endphp
+    <section class="site-landing-hero relative overflow-hidden rounded-3xl border px-6 py-6 shadow-lg {{ $heroClasses }}">
+      @if ($isGuestLanding)
+        <div class="pointer-events-none absolute inset-0 opacity-90" aria-hidden="true">
+          <svg class="h-full w-full" viewBox="0 0 1200 260" fill="none" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="guestWaveStroke" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="rgba(191,219,254,0.08)" />
+                <stop offset="50%" stop-color="rgba(255,255,255,0.22)" />
+                <stop offset="100%" stop-color="rgba(125,211,252,0.10)" />
+              </linearGradient>
+            </defs>
+
+            <g class="landing-wave-slow">
+              <path d="M0 172C96 160 152 124 247 128C342 132 406 188 499 188C591 188 651 141 745 136C853 130 911 184 1012 180C1084 177 1144 146 1200 132" stroke="url(#guestWaveStroke)" stroke-width="2.5" stroke-linecap="round"/>
+            </g>
+            <g class="landing-wave-fast">
+              <path d="M0 208C86 221 153 235 241 228C340 220 389 170 486 166C592 161 649 205 752 206C862 206 911 169 1013 160C1089 154 1143 169 1200 180" stroke="rgba(255,255,255,0.18)" stroke-width="1.6" stroke-linecap="round"/>
+            </g>
+
+            <g class="landing-dot-cluster landing-dot-cluster-a" fill="rgba(255,255,255,0.32)">
+              <circle cx="902" cy="58" r="3.5"/>
+              <circle cx="938" cy="79" r="2.5"/>
+              <circle cx="972" cy="51" r="2.75"/>
+              <circle cx="1011" cy="72" r="2.25"/>
+              <circle cx="1052" cy="44" r="3"/>
+              <circle cx="1086" cy="68" r="2.5"/>
+            </g>
+
+            <g class="landing-dot-cluster landing-dot-cluster-b" fill="rgba(191,219,254,0.28)">
+              <circle cx="764" cy="188" r="2.5"/>
+              <circle cx="802" cy="172" r="2.25"/>
+              <circle cx="842" cy="196" r="3"/>
+              <circle cx="881" cy="182" r="2"/>
+              <circle cx="918" cy="204" r="2.5"/>
+              <circle cx="956" cy="190" r="2.25"/>
+            </g>
+          </svg>
+        </div>
+      @endif
+      <div class="absolute inset-y-0 right-0 hidden w-1/4 lg:block {{ $heroAccentClasses }}"></div>
       <div class="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div class="max-w-3xl">
-          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-300">Operations Overview</p>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.28em] {{ $isGuestLanding ? 'text-blue-100' : 'text-slate-300' }}">
+            {{ $isGuestLanding ? 'Operations Portal' : 'Operations Overview' }}
+          </p>
           <div class="mt-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:gap-4">
             <h1 class="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
               {{ auth()->check() ? 'Good to see you, ' . auth()->user()->name : 'Welcome to Site Bulletin' }}
@@ -59,9 +108,15 @@
               </p>
             @endauth
           </div>
-          <p class="mt-3 max-w-2xl text-sm text-slate-300">
-            Start with the highest-priority work, then move into updates, tickets, and performance detail below.
-          </p>
+          @if ($isGuestLanding)
+            <p class="mt-3 max-w-2xl text-sm text-slate-100">
+              Sign in to check site updates, open quick resources, message your team, and track operational issues in one place.
+            </p>
+          @else
+            <p class="mt-3 max-w-2xl text-sm text-slate-300">
+              Start with the highest-priority work, then move into updates, tickets, and performance detail below.
+            </p>
+          @endif
         </div>
         @auth
           <div class="flex flex-wrap gap-3">
@@ -88,30 +143,30 @@
       'employeeWorkToday' => $employeeWorkToday ?? null,
   ])
 
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Announcements</p>
-      <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $announcementCount }}</p>
-      <p class="text-sm text-slate-500">{{ $announcementCount === 1 ? 'Update' : 'Updates' }} currently published</p>
-    </div>
-    <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick Link Categories</p>
-      <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $categoryCount }}</p>
-      <p class="text-sm text-slate-500">Organised resource hubs</p>
-    </div>
-    <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Individual Links</p>
-      <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $linkCount }}</p>
-      <p class="text-sm text-slate-500">Ready-to-open destinations</p>
-    </div>
-    @auth
+  @auth
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Announcements</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $announcementCount }}</p>
+        <p class="text-sm text-slate-500">{{ $announcementCount === 1 ? 'Update' : 'Updates' }} currently published</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick Link Categories</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $categoryCount }}</p>
+        <p class="text-sm text-slate-500">Organised resource hubs</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Individual Links</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $linkCount }}</p>
+        <p class="text-sm text-slate-500">Ready-to-open destinations</p>
+      </div>
       <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Performance Weeks</p>
         <p class="mt-2 text-2xl font-semibold text-slate-900">{{ $snapshotCount }}</p>
         <p class="text-sm text-slate-500">Recently tracked data points</p>
       </div>
-    @endauth
-  </section>
+    </section>
+  @endauth
 
   @include('dashboard.partials.manager-attention-queue', [
       'managerAttentionQueue' => $managerAttentionQueue ?? null,

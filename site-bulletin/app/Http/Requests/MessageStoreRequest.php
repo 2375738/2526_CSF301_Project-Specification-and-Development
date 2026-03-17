@@ -14,7 +14,21 @@ class MessageStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'max:2000'],
+            'body' => ['nullable', 'string', 'max:2000'],
+            'attachments' => ['nullable', 'array', 'max:5'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $body = trim((string) $this->input('body', ''));
+            $hasAttachments = $this->hasFile('attachments');
+
+            if ($body === '' && ! $hasAttachments) {
+                $validator->errors()->add('body', 'Enter a message or attach at least one file.');
+            }
+        });
     }
 }

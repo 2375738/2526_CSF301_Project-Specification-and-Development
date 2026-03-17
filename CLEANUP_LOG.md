@@ -23,3 +23,51 @@ Keep only files directly related to:
 
 ### Notes
 Next phase is a structured parity comparison between Laravel and the implementation guide, followed by gap implementation and functionality polish.
+
+## 2026-03-16 - Root Documentation Consolidation
+
+### Objective
+Move product-facing documentation into the Laravel app folder and keep the repository root limited to codebase directories plus governance/coordination files.
+
+### Changed
+- moved the detailed product/setup documentation into `site-bulletin/README.md`
+- replaced the root `README.md` with a short repo guide
+
+### Removed
+- `PARITY_MATRIX.md`
+- `TAB_UX_COMPARISON_MATRIX.md`
+
+### Retained (Intentional)
+- `site-bulletin/`
+- `data/`
+- `AGENTS.md`
+- `CLEANUP_LOG.md`
+- `IMPLEMENTATION_LOG.md`
+- `README.md` (repo-level only)
+
+### Notes
+The root folder is now closer to the intended narrowed scope in `AGENTS.md`, while application-specific setup and feature documentation live with the Laravel app itself.
+
+## 2026-03-17 - Removed Legacy Implementation Guide Folder
+
+### Objective
+Remove the unused TypeScript implementation-guide bundle so the repository contains only the active Laravel app, supporting data, and governance files.
+
+### Removed
+- `Site Bulletin Implementation Guide/`
+
+### Updated
+- `AGENTS.md`
+- `README.md`
+- `site-bulletin/README.md`
+
+### Retained (Intentional)
+- `site-bulletin/`
+- `data/`
+- `AGENTS.md`
+- `CLEANUP_LOG.md`
+- `IMPLEMENTATION_LOG.md`
+- `README.md`
+
+### Notes
+The implementation guide had become historical reference only. Runtime, seeding, and testing all now depend solely on the Laravel application in `site-bulletin/`.

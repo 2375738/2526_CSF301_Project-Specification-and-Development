@@ -43,41 +43,8 @@
           <p class="text-xs text-slate-500">Productivity and quality charts with the same interaction model as the manager view.</p>
         </div>
       </header>
-      @if ($employeeOverview && collect($employeeOverview['series'])->isNotEmpty())
-        @php
-          $employeeSeries = collect($employeeOverview['series'])->values();
-          $employeeTargetProductivity = (float) ($employeeOverview['target_productivity'] ?? 42);
-          $employeeTargetQuality = (float) ($employeeOverview['target_quality'] ?? 95);
-          $employeeMaxProd = max(55.0, (float) $employeeSeries->max('productivity') + 8.0, $employeeTargetProductivity + 8.0);
-          $employeeMinProd = max(0.0, min((float) floor(($employeeSeries->min('productivity') ?? 0) - 8.0), $employeeTargetProductivity - 10.0));
-          $employeeMaxQuality = 100.0;
-          $employeeMinQuality = max(0.0, min((float) floor(($employeeSeries->min('quality') ?? 80) - 8.0), $employeeTargetQuality - 12.0));
-          $employeeWidth = 640;
-          $employeeHeight = 230;
-          $employeePaddingX = 42;
-          $employeePaddingTop = 18;
-          $employeePaddingBottom = 26;
-          $employeePlotWidth = $employeeWidth - ($employeePaddingX * 2);
-          $employeePlotHeight = $employeeHeight - ($employeePaddingTop + $employeePaddingBottom);
-          $employeeCount = max(1, $employeeSeries->count());
-          $employeeStepX = $employeeCount > 1 ? ($employeePlotWidth / ($employeeCount - 1)) : 0;
-
-          $employeeCoords = function ($key, $minY, $maxY) use ($employeeSeries, $employeePaddingX, $employeePaddingTop, $employeePlotHeight, $employeeStepX) {
-              $range = max(1, $maxY - $minY);
-              return $employeeSeries->values()->map(function ($point, $index) use ($key, $range, $minY, $employeePaddingX, $employeePaddingTop, $employeePlotHeight, $employeeStepX) {
-                  $x = $employeePaddingX + ($index * $employeeStepX);
-                  $normalized = ((float) $point[$key] - $minY) / $range;
-                  $y = $employeePaddingTop + ($employeePlotHeight - ($normalized * $employeePlotHeight));
-                  return number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
-              })->implode(' ');
-          };
-
-          $employeeProdRange = max(1, $employeeMaxProd - $employeeMinProd);
-          $employeeQualityRange = max(1, $employeeMaxQuality - $employeeMinQuality);
-          $employeeProdTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetProductivity - $employeeMinProd) / $employeeProdRange) * $employeePlotHeight));
-          $employeeQualityTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetQuality - $employeeMinQuality) / $employeeQualityRange) * $employeePlotHeight));
-        @endphp
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 space-y-4">
+      @if ($employeeOverview && collect($employeeOverview['series_by_scale'] ?? [])->flatten(1)->isNotEmpty())
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 space-y-4" x-data="{ activeScale: '{{ $employeeOverview['active_scale'] ?? '7d' }}' }">
           <div class="flex items-center justify-between px-1">
             <div>
               <h3 class="text-sm font-semibold text-slate-900">Performance Trend</h3>
@@ -85,16 +52,56 @@
             </div>
             <div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 text-xs">
               @foreach (['7d' => 'Last 7 days', '24h' => 'Last 24 hours', '3h' => 'Last 3 hours'] as $scaleKey => $scaleLabel)
-                <a
-                  href="{{ route('home', ['scale' => $scaleKey]) }}"
-                  class="rounded-md px-2 py-1 {{ ($employeeOverview['active_scale'] ?? '7d') === $scaleKey ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100' }}"
+                <button
+                  type="button"
+                  x-on:click="activeScale = '{{ $scaleKey }}'"
+                  x-bind:class="activeScale === '{{ $scaleKey }}' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+                  class="rounded-md px-2 py-1"
                 >
                   {{ $scaleLabel }}
-                </a>
+                </button>
               @endforeach
             </div>
           </div>
 
+          @foreach (['7d', '24h', '3h'] as $employeeScaleKey)
+            @php
+              $employeeSeries = collect($employeeOverview['series_by_scale'][$employeeScaleKey] ?? [])->values();
+              $employeeTargetProductivity = (float) ($employeeOverview['target_productivity'] ?? 42);
+              $employeeTargetQuality = (float) ($employeeOverview['target_quality'] ?? 95);
+              $employeeMaxProd = max(55.0, (float) $employeeSeries->max('productivity') + 8.0, $employeeTargetProductivity + 8.0);
+              $employeeMinProd = max(0.0, min((float) floor(($employeeSeries->min('productivity') ?? 0) - 8.0), $employeeTargetProductivity - 10.0));
+              $employeeMaxQuality = 100.0;
+              $employeeMinQuality = max(0.0, min((float) floor(($employeeSeries->min('quality') ?? 80) - 8.0), $employeeTargetQuality - 12.0));
+              $employeeWidth = 640;
+              $employeeHeight = 230;
+              $employeePaddingX = 42;
+              $employeePaddingTop = 18;
+              $employeePaddingBottom = 26;
+              $employeePlotWidth = $employeeWidth - ($employeePaddingX * 2);
+              $employeePlotHeight = $employeeHeight - ($employeePaddingTop + $employeePaddingBottom);
+              $employeeCount = max(1, $employeeSeries->count());
+              $employeeStepX = $employeeCount > 1 ? ($employeePlotWidth / ($employeeCount - 1)) : 0;
+
+              $employeeCoords = function ($key, $minY, $maxY) use ($employeeSeries, $employeePaddingX, $employeePaddingTop, $employeePlotHeight, $employeeStepX) {
+                  $range = max(1, $maxY - $minY);
+                  return $employeeSeries->values()->map(function ($point, $index) use ($key, $range, $minY, $employeePaddingX, $employeePaddingTop, $employeePlotHeight, $employeeStepX) {
+                      $x = $employeePaddingX + ($index * $employeeStepX);
+                      $normalized = ((float) $point[$key] - $minY) / $range;
+                      $y = $employeePaddingTop + ($employeePlotHeight - ($normalized * $employeePlotHeight));
+                      return number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
+                  })->implode(' ');
+              };
+
+              $employeeProdRange = max(1, $employeeMaxProd - $employeeMinProd);
+              $employeeQualityRange = max(1, $employeeMaxQuality - $employeeMinQuality);
+              $employeeProdTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetProductivity - $employeeMinProd) / $employeeProdRange) * $employeePlotHeight));
+              $employeeQualityTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetQuality - $employeeMinQuality) / $employeeQualityRange) * $employeePlotHeight));
+              $employeePeakProductivity = round((float) $employeeSeries->max('productivity'), 1);
+              $employeeLatestQuality = round((float) ($employeeSeries->last()['quality'] ?? 0), 1);
+              $employeeBestQuality = round((float) $employeeSeries->max('quality'), 1);
+            @endphp
+          <div x-cloak x-show="activeScale === '{{ $employeeScaleKey }}'" class="space-y-4">
           <div class="grid gap-4 lg:grid-cols-2">
             <div
               class="rounded-lg border border-slate-200 bg-white p-3"
@@ -186,25 +193,26 @@
               </div>
             </div>
           </div>
-        </div>
-      @endif
-
-      <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-3 sm:grid-cols-2">
         <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
           <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Peak Throughput</p>
-          <p class="mt-1 text-2xl font-semibold text-blue-900">{{ number_format((float) ($employeeOverview['peak_productivity'] ?? $employeeTrend->max('units_per_hour')), 1) }} /hr</p>
+          <p class="mt-1 text-2xl font-semibold text-blue-900">{{ number_format((float) $employeePeakProductivity, 1) }} /hr</p>
           <p class="text-xs text-blue-700">Highest point in selected trend window</p>
         </div>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Rank Trend</p>
           <p class="mt-1 text-2xl font-semibold text-emerald-900">
-            {{ number_format((float) ($employeeOverview['latest_quality'] ?? (100 - ($employeeLatestRank ?? 100))), 1) }}%
+            {{ number_format((float) $employeeLatestQuality, 1) }}%
           </p>
           <p class="text-xs text-emerald-700">
-            Quality view. Best in window: {{ number_format((float) ($employeeOverview['best_quality'] ?? (100 - ($employeeBestRank ?? 100))), 1) }}%
+            Quality view. Best in window: {{ number_format((float) $employeeBestQuality, 1) }}%
           </p>
         </div>
       </div>
+          </div>
+          @endforeach
+        </div>
+      @endif
     </section>
   @endif
 
@@ -266,39 +274,8 @@
         </div>
       </header>
 
-      @if ($managerOverview && collect($managerOverview['series'])->isNotEmpty())
-        @php
-          $series = collect($managerOverview['series'])->values();
-          $maxProd = max(55.0, (float) $series->max('productivity') + 8.0, (float) ($managerOverview['target_productivity'] ?? 42) + 8.0);
-          $minProd = max(0.0, (float) floor(($series->min('productivity') ?? 0) - 8.0));
-          $maxQuality = 100.0;
-          $minQuality = max(70.0, (float) floor(($series->min('quality') ?? 80) - 8.0));
-          $width = 640;
-          $height = 230;
-          $paddingX = 42;
-          $paddingTop = 18;
-          $paddingBottom = 26;
-          $plotWidth = $width - ($paddingX * 2);
-          $plotHeight = $height - ($paddingTop + $paddingBottom);
-          $count = max(1, $series->count());
-          $stepX = $count > 1 ? ($plotWidth / ($count - 1)) : 0;
-
-          $coords = function ($key, $minY, $maxY) use ($series, $paddingX, $paddingTop, $plotHeight, $stepX) {
-              $range = max(1, $maxY - $minY);
-              return $series->values()->map(function ($point, $index) use ($key, $range, $minY, $paddingX, $paddingTop, $plotHeight, $stepX) {
-                  $x = $paddingX + ($index * $stepX);
-                  $normalized = ((float) $point[$key] - $minY) / $range;
-                  $y = $paddingTop + ($plotHeight - ($normalized * $plotHeight));
-                  return number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
-              })->implode(' ');
-          };
-
-          $prodRange = max(1, $maxProd - $minProd);
-          $qualityRange = max(1, $maxQuality - $minQuality);
-          $prodTargetY = $paddingTop + ($plotHeight - ((((float) ($managerOverview['target_productivity'] ?? 42) - $minProd) / $prodRange) * $plotHeight));
-          $qualityTargetY = $paddingTop + ($plotHeight - ((((float) ($managerOverview['target_quality'] ?? 95) - $minQuality) / $qualityRange) * $plotHeight));
-        @endphp
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 space-y-4">
+      @if ($managerOverview && collect($managerOverview['series_by_scale'] ?? [])->flatten(1)->isNotEmpty())
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 space-y-4" x-data="{ activeScale: '{{ $managerOverview['active_scale'] ?? '7d' }}' }">
           <div class="flex items-center justify-between px-1">
             <div>
               <h3 class="text-sm font-semibold text-slate-900">Department Operational Performance</h3>
@@ -306,16 +283,51 @@
             </div>
             <div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 text-xs">
               @foreach (['7d' => 'Last 7 days', '24h' => 'Last 24 hours', '3h' => 'Last 3 hours'] as $scaleKey => $scaleLabel)
-                <a
-                  href="{{ route('home', ['scale' => $scaleKey]) }}"
-                  class="rounded-md px-2 py-1 {{ ($managerOverview['active_scale'] ?? '7d') === $scaleKey ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100' }}"
+                <button
+                  type="button"
+                  x-on:click="activeScale = '{{ $scaleKey }}'"
+                  x-bind:class="activeScale === '{{ $scaleKey }}' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+                  class="rounded-md px-2 py-1"
                 >
                   {{ $scaleLabel }}
-                </a>
+                </button>
               @endforeach
             </div>
           </div>
 
+          @foreach (['7d', '24h', '3h'] as $managerScaleKey)
+            @php
+              $series = collect($managerOverview['series_by_scale'][$managerScaleKey] ?? [])->values();
+              $maxProd = max(55.0, (float) $series->max('productivity') + 8.0, (float) ($managerOverview['target_productivity'] ?? 42) + 8.0);
+              $minProd = max(0.0, (float) floor(($series->min('productivity') ?? 0) - 8.0));
+              $maxQuality = 100.0;
+              $minQuality = max(70.0, (float) floor(($series->min('quality') ?? 80) - 8.0));
+              $width = 640;
+              $height = 230;
+              $paddingX = 42;
+              $paddingTop = 18;
+              $paddingBottom = 26;
+              $plotWidth = $width - ($paddingX * 2);
+              $plotHeight = $height - ($paddingTop + $paddingBottom);
+              $count = max(1, $series->count());
+              $stepX = $count > 1 ? ($plotWidth / ($count - 1)) : 0;
+
+              $coords = function ($key, $minY, $maxY) use ($series, $paddingX, $paddingTop, $plotHeight, $stepX) {
+                  $range = max(1, $maxY - $minY);
+                  return $series->values()->map(function ($point, $index) use ($key, $range, $minY, $paddingX, $paddingTop, $plotHeight, $stepX) {
+                      $x = $paddingX + ($index * $stepX);
+                      $normalized = ((float) $point[$key] - $minY) / $range;
+                      $y = $paddingTop + ($plotHeight - ($normalized * $plotHeight));
+                      return number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
+                  })->implode(' ');
+              };
+
+              $prodRange = max(1, $maxProd - $minProd);
+              $qualityRange = max(1, $maxQuality - $minQuality);
+              $prodTargetY = $paddingTop + ($plotHeight - ((((float) ($managerOverview['target_productivity'] ?? 42) - $minProd) / $prodRange) * $plotHeight));
+              $qualityTargetY = $paddingTop + ($plotHeight - ((((float) ($managerOverview['target_quality'] ?? 95) - $minQuality) / $qualityRange) * $plotHeight));
+            @endphp
+          <div x-cloak x-show="activeScale === '{{ $managerScaleKey }}'">
           <div class="grid gap-4 lg:grid-cols-2">
             <div
               class="rounded-lg border border-slate-200 bg-white p-3"
@@ -477,6 +489,8 @@
               </div>
             </div>
           </div>
+          </div>
+          @endforeach
         </div>
 
         @if ($managerHealthSummary)

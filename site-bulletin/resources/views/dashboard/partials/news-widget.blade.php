@@ -55,7 +55,6 @@
                   </span>
                 @endunless
               </div>
-              </div>
             </div>
             <div class="mt-3 flex justify-end">
               <a href="{{ route('announcements.show', $announcement) }}" class="text-xs font-semibold text-blue-600 hover:underline">

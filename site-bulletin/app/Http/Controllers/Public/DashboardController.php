@@ -16,6 +16,7 @@ use App\Models\PerformanceSample;
 use App\Models\RoleChangeRequest;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\DemoOperationsSimulationService;
 use App\Services\DepartmentAnalyticsService;
 use App\Services\PerformanceService;
 use Illuminate\Http\Request;
@@ -26,10 +27,15 @@ class DashboardController extends Controller
     public function __invoke(
         Request $request,
         PerformanceService $performanceService,
-        DepartmentAnalyticsService $departmentAnalytics
+        DepartmentAnalyticsService $departmentAnalytics,
+        DemoOperationsSimulationService $demoOperationsSimulation
     )
     {
         $user = $request->user();
+
+        if ($user) {
+            $demoOperationsSimulation->ensureFreshSamples();
+        }
 
         $announcements = Announcement::query()
             ->with(['author', 'department'])
@@ -884,6 +890,10 @@ class DashboardController extends Controller
             ];
         }
 
+        $seriesEnd = $samples->last()?->recorded_at?->copy() ?? now();
+        $last24Start = $seriesEnd->copy()->subHours(24);
+        $last3Start = $seriesEnd->copy()->subHours(3);
+
         $daily = $samples->groupBy(fn (PerformanceSample $sample) => $sample->recorded_at?->toDateString())
             ->take(-7)
             ->map(function ($group, $date) {
@@ -899,7 +909,7 @@ class DashboardController extends Controller
             })
             ->values();
 
-        $last24 = $samples->where('recorded_at', '>=', now()->subHours(24))
+        $last24 = $samples->filter(fn (PerformanceSample $sample) => $sample->recorded_at && $sample->recorded_at->greaterThanOrEqualTo($last24Start))
             ->groupBy(function (PerformanceSample $sample) {
                 $timestamp = $sample->recorded_at?->copy();
 
@@ -925,7 +935,7 @@ class DashboardController extends Controller
             })
             ->values();
 
-        $last3 = $samples->where('recorded_at', '>=', now()->subHours(3))
+        $last3 = $samples->filter(fn (PerformanceSample $sample) => $sample->recorded_at && $sample->recorded_at->greaterThanOrEqualTo($last3Start))
             ->groupBy(fn (PerformanceSample $sample) => $sample->recorded_at?->copy()?->startOfMinute()->format('Y-m-d H:i:s'))
             ->filter()
             ->map(function ($group, $bucket) {

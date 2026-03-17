@@ -7,12 +7,16 @@ use App\Http\Requests\ConversationStoreRequest;
 use App\Models\Conversation;
 use App\Models\Department;
 use App\Models\ManagerRelationship;
+use App\Models\Message;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ConversationController extends Controller
@@ -20,81 +24,11 @@ class ConversationController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
+        $context = $this->buildInboxContext($user, $request);
 
-        $filterType = $request->query('type');
-        $search = trim((string) $request->query('q', ''));
-
-        if ($filterType && ! in_array($filterType, ['direct', 'department', 'announcement'], true)) {
-            $filterType = null;
-        }
-
-        $baseQuery = Conversation::query()
-            ->forUser($user)
-            ->with([
-                'participants:id,name,role',
-                'messages' => fn ($query) => $query->latest()->with('sender:id,name,role')->limit(1),
-                'department:id,name',
-            ])
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($nested) use ($search) {
-                    $nested->where('subject', 'like', '%' . $search . '%')
-                        ->orWhereHas('participants', fn ($participants) => $participants->where('users.name', 'like', '%' . $search . '%'))
-                        ->orWhereHas('messages', fn ($messages) => $messages->where('body', 'like', '%' . $search . '%'));
-                });
-            });
-
-        $conversations = (clone $baseQuery)
-            ->when($filterType, fn ($query) => $query->where('type', $filterType))
-            ->orderByDesc('updated_at')
-            ->paginate(10)
-            ->withQueryString();
-
-        $previewConversations = (clone $baseQuery)
-            ->when($filterType, fn ($query) => $query->where('type', $filterType))
-            ->orderByDesc('updated_at')
-            ->take(3)
-            ->get()
-            ->map(function (Conversation $conversation) use ($user) {
-                $conversation->unread_count = $conversation->unreadCountFor($user);
-                return $conversation;
-            });
-
-        $unreadConversationCount = Conversation::query()
-            ->forUser($user)
-            ->whereHas('participants', function ($query) use ($user) {
-                $query->where('users.id', $user->id)
-                    ->where(function ($sub) {
-                        $sub->whereNull('conversation_participants.last_read_at')
-                            ->orWhereColumn('conversation_participants.last_read_at', '<', 'conversations.updated_at');
-                    });
-            })
-            ->count();
-
-        $managedDepartmentOptions = collect();
-
-        if ($user->hasRole('hr', 'admin', 'ops_manager')) {
-            $managedDepartmentOptions = Department::orderBy('name')->pluck('name', 'id');
-        } elseif ($user->isManager()) {
-            $managedDepartmentOptions = $user->managedDepartments()->orderBy('departments.name')->pluck('departments.name', 'departments.id');
-        }
-
-        $recipientOptions = User::query()
-            ->where('id', '!=', $user->id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'role']);
-
-        $shortcutOptions = $this->buildShortcutOptions($user);
-
-        return view('messages.index', [
-            'conversations' => $conversations,
-            'previewConversations' => $previewConversations,
-            'unreadConversationCount' => $unreadConversationCount,
-            'managedDepartmentOptions' => $managedDepartmentOptions,
-            'recipientOptions' => $recipientOptions,
-            'shortcutOptions' => $shortcutOptions,
-            'activeType' => $filterType,
-            'search' => $search,
-        ]);
+        return view('messages.index', array_merge($context, [
+            'selectedConversation' => null,
+        ]));
     }
 
     public function show(Request $request, Conversation $conversation): View
@@ -102,6 +36,7 @@ class ConversationController extends Controller
         $conversation->load([
             'participants:id,name,role',
             'messages.sender:id,name,role',
+            'messages.attachments',
             'department:id,name',
         ]);
 
@@ -109,9 +44,20 @@ class ConversationController extends Controller
 
         $conversation->markReadFor($request->user());
 
-        return view('messages.show', [
-            'conversation' => $conversation,
+        $conversation->load([
+            'participants:id,name,role',
+            'messages.sender:id,name,role',
+            'messages.attachments',
+            'department:id,name',
         ]);
+
+        $selectedConversation = $this->decorateSelectedConversation($conversation, $request->user());
+        $context = $this->buildInboxContext($request->user(), $request);
+
+        return view('messages.show', array_merge($context, [
+            'selectedConversation' => $selectedConversation,
+            'conversation' => $selectedConversation,
+        ]));
     }
 
     public function updateLock(Request $request, Conversation $conversation, AuditLogger $auditLogger): RedirectResponse
@@ -220,11 +166,13 @@ class ConversationController extends Controller
             ]);
         }
 
-        $conversation->messages()->create([
+        $message = $conversation->messages()->create([
             'sender_id' => $user->id,
-            'body' => $body,
+            'body' => $this->normaliseBody($body),
             'is_system' => false,
         ]);
+
+        $this->persistAttachments($request, $message);
 
         $conversation->touch();
 
@@ -351,6 +299,124 @@ class ConversationController extends Controller
             ->whereDoesntHave('participants', fn ($query) => $query->whereNotIn('users.id', $ids))
             ->orderByDesc('updated_at')
             ->first();
+
+        return $conversation;
+    }
+
+    protected function persistAttachments(ConversationStoreRequest $request, Message $message): void
+    {
+        foreach ($request->file('attachments', []) as $file) {
+            $message->attachments()->create([
+                'user_id' => $request->user()->id,
+                'disk' => 'attachments',
+                'path' => $file->storeAs(
+                    'messages/' . $message->conversation_id . '/' . $message->id,
+                    Str::uuid() . '.' . $file->getClientOriginalExtension(),
+                    'attachments'
+                ),
+                'original_name' => $file->getClientOriginalName(),
+                'mime' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+            ]);
+        }
+    }
+
+    protected function normaliseBody(?string $body): ?string
+    {
+        $body = trim((string) $body);
+
+        return $body === '' ? null : $body;
+    }
+
+    protected function buildInboxContext(User $user, Request $request): array
+    {
+        $filterType = $request->query('type');
+        $search = trim((string) $request->query('q', ''));
+
+        if ($filterType && ! in_array($filterType, ['direct', 'department', 'announcement'], true)) {
+            $filterType = null;
+        }
+
+        $baseQuery = $this->conversationInboxQuery($user, $search);
+
+        /** @var LengthAwarePaginator $conversations */
+        $conversations = (clone $baseQuery)
+            ->when($filterType, fn ($query) => $query->where('type', $filterType))
+            ->orderByDesc('updated_at')
+            ->paginate(14)
+            ->withQueryString();
+
+        $conversations->setCollection(
+            $conversations->getCollection()->map(fn (Conversation $conversation) => $this->decorateInboxConversation($conversation, $user))
+        );
+
+        $unreadConversationCount = Conversation::query()
+            ->forUser($user)
+            ->whereHas('participants', function ($query) use ($user) {
+                $query->where('users.id', $user->id)
+                    ->where(function ($sub) {
+                        $sub->whereNull('conversation_participants.last_read_at')
+                            ->orWhereColumn('conversation_participants.last_read_at', '<', 'conversations.updated_at');
+                    });
+            })
+            ->count();
+
+        $managedDepartmentOptions = collect();
+
+        if ($user->hasRole('hr', 'admin', 'ops_manager')) {
+            $managedDepartmentOptions = Department::orderBy('name')->pluck('name', 'id');
+        } elseif ($user->isManager()) {
+            $managedDepartmentOptions = $user->managedDepartments()->orderBy('departments.name')->pluck('departments.name', 'departments.id');
+        }
+
+        $recipientOptions = User::query()
+            ->where('id', '!=', $user->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'role']);
+
+        return [
+            'conversations' => $conversations,
+            'unreadConversationCount' => $unreadConversationCount,
+            'managedDepartmentOptions' => $managedDepartmentOptions,
+            'recipientOptions' => $recipientOptions,
+            'shortcutOptions' => $this->buildShortcutOptions($user),
+            'activeType' => $filterType,
+            'search' => $search,
+        ];
+    }
+
+    protected function conversationInboxQuery(User $user, string $search = ''): Builder
+    {
+        return Conversation::query()
+            ->forUser($user)
+            ->with([
+                'participants:id,name,role',
+                'messages' => fn ($query) => $query->latest()->with('sender:id,name,role')->limit(1),
+                'department:id,name',
+            ])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('subject', 'like', '%' . $search . '%')
+                        ->orWhereHas('participants', fn ($participants) => $participants->where('users.name', 'like', '%' . $search . '%'))
+                        ->orWhereHas('messages', fn ($messages) => $messages->where('body', 'like', '%' . $search . '%'));
+                });
+            });
+    }
+
+    protected function decorateInboxConversation(Conversation $conversation, User $user): Conversation
+    {
+        $latestMessage = $conversation->messages->sortByDesc('created_at')->first();
+
+        $conversation->latest_message = $latestMessage;
+        $conversation->unread_count = $conversation->unreadCountFor($user);
+
+        return $conversation;
+    }
+
+    protected function decorateSelectedConversation(Conversation $conversation, User $user): Conversation
+    {
+        $conversation->latest_message = $conversation->messages->sortByDesc('created_at')->first();
+        $conversation->unread_count = 0;
 
         return $conversation;
     }

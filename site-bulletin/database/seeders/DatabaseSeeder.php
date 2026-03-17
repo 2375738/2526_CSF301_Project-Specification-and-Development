@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Models\User;
@@ -17,14 +16,14 @@ use App\Models\TicketComment;
 use App\Models\TicketStatusChange;
 use App\Models\TicketAttachment;
 use App\Models\SLASetting;
-use App\Models\PerformanceSnapshot;
-use App\Models\PerformanceSample;
 use App\Models\ManagerRelationship;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\RoleChangeRequest;
 use App\Models\DepartmentMetric;
 use App\Models\KnowledgeSnippet;
+use App\Services\DemoOperationsSimulationService;
+use App\Services\DemoTicketLifecycleSimulationService;
 use App\Services\SLAService;
 use App\Services\DepartmentAnalyticsService;
 
@@ -736,71 +735,8 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        PerformanceSnapshot::query()->delete();
-        PerformanceSample::query()->delete();
-
-        // Performance samples are the source of truth. Weekly snapshots are derived from them.
-        foreach (User::all() as $u) {
-            $profileDepartment = $u->primaryDepartment ?: $u->departments()->first();
-            $targetUnits = (float) ($profileDepartment?->target_units_per_hour ?: 42.0);
-            $targetQuality = (float) ($profileDepartment?->target_quality_pct ?: 95.0);
-            $samples = [];
-            $sampleStart = now()->subWeeks(6)->startOfMinute()->setMinute((int) (floor(now()->subWeeks(6)->minute / 15) * 15))->setSecond(0);
-            $sampleCount = 6 * 7 * 24 * 4;
-
-            foreach (range(0, $sampleCount) as $offset) {
-                $recordedAt = $sampleStart->copy()->addMinutes($offset * 15);
-                $progress = $sampleCount > 0 ? ($offset / $sampleCount) : 0;
-                $hourFraction = ((int) $recordedAt->format('H') + ((int) $recordedAt->format('i') / 60)) / 24;
-                $dailyWave = sin(($hourFraction * M_PI * 2) - 0.8);
-                $weeklyWave = sin((((int) $recordedAt->dayOfWeekIso / 7) * M_PI * 2) + ($u->id % 5));
-                $productivityFactor = 0.92
-                    + ($dailyWave * 0.10)
-                    + ($weeklyWave * 0.05)
-                    + (($this->seededRatio("sample-{$u->id}-{$recordedAt->format('YmdHi')}-uph") - 0.5) * 0.12);
-                $qualityFactor = 0.985
-                    + ($dailyWave * 0.015)
-                    + ($weeklyWave * 0.01)
-                    + (($this->seededRatio("sample-{$u->id}-{$recordedAt->format('YmdHi')}-quality") - 0.5) * 0.05);
-
-                $samples[] = [
-                    'user_id' => $u->id,
-                    'recorded_at' => $recordedAt,
-                    'units_per_hour' => round(max(8, min(180, $targetUnits * $productivityFactor)), 1),
-                    'quality_score' => round(max(70, min(100, $targetQuality * $qualityFactor)), 1),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-
-            PerformanceSample::upsert($samples, ['user_id', 'recorded_at'], ['units_per_hour', 'quality_score', 'updated_at']);
-
-            $snapshotRows = collect($samples)
-                ->groupBy(fn (array $sample) => Carbon::parse($sample['recorded_at'])->startOfWeek(Carbon::MONDAY)->toDateString())
-                ->map(function ($group, $weekStart) use ($u) {
-                    $avgUnits = round((float) collect($group)->avg('units_per_hour'));
-                    $avgQuality = round((float) collect($group)->avg('quality_score'), 1);
-                    $rankPercentile = (int) round(max(1, min(99, 100 - $avgQuality)));
-
-                    return [
-                        'user_id' => $u->id,
-                        'week_start' => $weekStart,
-                        'units_per_hour' => (int) $avgUnits,
-                        'rank_percentile' => $rankPercentile,
-                        'quality_score' => $avgQuality,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                })
-                ->values()
-                ->all();
-
-            PerformanceSnapshot::upsert(
-                $snapshotRows,
-                ['user_id', 'week_start'],
-                ['units_per_hour', 'rank_percentile', 'quality_score', 'updated_at']
-            );
-        }
+        app(DemoTicketLifecycleSimulationService::class)->refreshWindow(7, now());
+        app(DemoOperationsSimulationService::class)->seedHistoricalWindow(6, now());
 
         // Conversations & Messages
         $directConversation = Conversation::firstOrCreate([
@@ -984,8 +920,4 @@ class DatabaseSeeder extends Seeder
         return null;
     }
 
-    private function seededRatio(string $key): float
-    {
-        return ((float) sprintf('%u', crc32($key))) / 4294967295;
-    }
 }

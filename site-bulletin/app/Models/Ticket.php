@@ -22,6 +22,7 @@ class Ticket extends Model
         'created_for_id',
         'department_id',
         'template_key',
+        'simulation_key',
         'duplicate_of_id',
         'priority',
         'status',

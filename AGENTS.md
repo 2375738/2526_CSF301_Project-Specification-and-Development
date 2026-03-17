@@ -1,16 +1,14 @@
 # AGENTS.md
 
 ## Repository Scope
-This repository is intentionally narrowed to two implementation tracks:
+This repository is intentionally narrowed to the primary Laravel PHP application:
 1. `site-bulletin/` - the primary Laravel PHP application.
-2. `Site Bulletin Implementation Guide/` - the TypeScript/React sample implementation guide.
 
 Supporting data retained for Laravel seeders:
 - `data/cwl1informationportal/`
 
 ## What To Keep
 - `site-bulletin/**`
-- `Site Bulletin Implementation Guide/**`
 - `data/**` only when referenced by app seeders or runtime.
 - Root documentation that governs work execution (`README.md`, `AGENTS.md`, `CLEANUP_LOG.md`, `IMPLEMENTATION_LOG.md`).
 
@@ -20,14 +18,12 @@ Supporting data retained for Laravel seeders:
 - Top-level duplicate app scaffolds that mirror code already inside `site-bulletin/`.
 
 ## Current Project Goal
-1. Compare Laravel app (`site-bulletin`) against the sample guide (`Site Bulletin Implementation Guide`).
-2. Identify implemented vs missing features.
-3. Implement missing guide-aligned behavior in Laravel.
-4. Polish and stabilize functionality after parity is reached.
+1. Stabilize and polish the Laravel app (`site-bulletin`).
+2. Implement and refine production-facing behavior in Laravel.
+3. Keep repository scope narrow and maintainable.
 
 ## Working Rules For Contributors
 - Treat `site-bulletin/` as source of truth for production behavior.
-- Treat `Site Bulletin Implementation Guide/` as the feature/UX reference.
 - Before adding new files at repo root, justify why they are needed for run/build/test/compare.
 - Keep changes traceable in `CLEANUP_LOG.md` or a dedicated implementation log.
 - Log every UI/UX change in `IMPLEMENTATION_LOG.md` with: date, scope, reason, and validation evidence (test command or manual check).

@@ -1757,3 +1757,232 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
 - Validation:
   - `php artisan view:clear`
   - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-12 - Guest landing intro simplified
+- Scope: `site-bulletin/resources/views/dashboard/partials/content.blade.php`
+- Reason: the logged-out landing state was showing dashboard-style number cards with low value before sign-in, and the black intro panel felt too heavy for a login-first entry experience.
+- Change:
+  - removed the summary number cards for guests while keeping them for authenticated users
+  - shifted the guest intro panel from black to a softer navy/slate-blue gradient
+  - updated guest-facing copy to explain the product more directly
+- Validation:
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-12 - Guest landing background animation added
+- Scope: `site-bulletin/resources/views/dashboard/partials/content.blade.php`, `site-bulletin/resources/css/app.css`
+- Reason: the logged-out intro needed more atmosphere after simplifying the guest landing state, but without adding heavy decorative content.
+- Change:
+  - added a subtle animated SVG-style background layer to the guest intro panel only
+  - used drifting dot clusters and soft wave lines for a modern, lightly coastal feel
+  - kept the motion low-contrast so it supports the hero instead of competing with the sign-in purpose
+- Validation:
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-12 - Full-page background atmosphere made subtly animated
+- Scope: `site-bulletin/resources/css/app.css`
+- Reason: after adding motion to the guest hero, the rest of the page background could support that direction with a lighter site-wide atmosphere rather than leaving all motion concentrated in one block.
+- Change:
+  - added slow drift to the existing gradient background
+  - added a very faint full-page dot/glow overlay using CSS-only pseudo-elements
+  - kept the motion slower and lower-contrast than the guest hero so content remains the priority
+  - slightly increased page-wide dot contrast and drift distance after initial review made the motion feel too static
+- Validation:
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-14 - Wide-screen dashboard horizontal overflow fixed
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`
+- Reason: authenticated dashboard content could overflow horizontally on wide screens because the main content flex column was not constrained to shrink within the shell layout.
+- Change:
+  - added `min-w-0` to the main app content column
+  - added `min-w-0` and `overflow-x-hidden` to the main content area wrapper
+  - added `overflow-x-hidden` to the page body as a guard against shell-level sideways scrolling
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-14 - Dashboard widget markup flow fixed
+- Scope: `site-bulletin/resources/views/dashboard/partials/news-widget.blade.php`
+- Reason: the authenticated dashboard could render later sections in the wrong position because the news widget contained an extra closing `div`, which broke the document flow after that block.
+- Change:
+  - removed the stray closing wrapper from the news widget card layout
+  - restored correct section flow so dashboard blocks after the widget render in sequence instead of drifting into a broken horizontal layout
+- Validation:
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-14 - Employee short-window trend scales anchored to latest sample data
+- Scope: `site-bulletin/app/Http/Controllers/Public/DashboardController.php`
+- Reason: selecting `Last 24 hours` or `Last 3 hours` on the employee dashboard could still show the 7-day chart because seeded mock samples are not generated up to the real current time, causing short-window queries relative to `now()` to return empty and fall back to daily data.
+- Change:
+  - anchored employee sample-window aggregation to the latest available `performance_samples.recorded_at` timestamp instead of the real current time
+  - kept `7d` as daily aggregation, while `24h` now resolves to recent hourly buckets and `3h` resolves to recent 15-minute points from the latest sample window
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-14 - Messages experience redesigned into messenger-style shell
+- Scope: `site-bulletin/app/Http/Controllers/Messaging/ConversationController.php`, `site-bulletin/resources/views/messages/_shell.blade.php`, `site-bulletin/resources/views/messages/index.blade.php`, `site-bulletin/resources/views/messages/show.blade.php`
+- Reason: the existing messages area behaved like a dashboard page with cards and side widgets rather than a familiar messenger, which made the UX feel unlike the chat products users already understand.
+- Change:
+  - refactored message inbox and conversation routes to use a shared messenger-shell data model
+  - replaced the old sectioned page layout with a two-pane inbox and active-thread experience
+  - moved search and type filters into the left inbox column
+  - redesigned conversation rows to show avatar, title, preview text, timestamp, type badge, and unread badge
+  - redesigned the thread view with messenger-like header, date separators, left/right message bubbles, and bottom composer
+  - moved `Quick Contact`, `Start Conversation`, and `Department Broadcast` into the empty-state compose panel instead of leaving them as separate dashboard-like side cards
+- Validation:
+  - `php artisan test tests/Feature/Messaging`
+  - `php artisan test tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-14 - Messages navigation made responsive for mobile thread flow
+- Scope: `site-bulletin/resources/views/messages/_shell.blade.php`
+- Reason: the new messenger layout still needed standard mobile navigation behavior, where opening a conversation on a small screen should replace the inbox and provide a clear return path without inventing a separate bottom back pattern.
+- Change:
+  - hid the inbox pane on smaller screens when a conversation is open
+  - hid the thread pane on smaller screens when no conversation is selected
+  - added a mobile-only back button in the thread header that returns to the inbox list
+  - kept the two-pane messenger layout unchanged on wide screens
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-14 - Messages compose tools moved behind New Chat entry point
+- Scope: `site-bulletin/resources/views/messages/_shell.blade.php`
+- Reason: the large wide-screen `Quick Contact` and compose utility blocks still felt more like dashboard widgets than messenger UI, even after the shell redesign.
+- Change:
+  - removed the large compose utility panels from the main wide-screen message layout
+  - replaced the inbox header plus button with a real `New chat` launcher
+  - moved `Quick Contact`, `Start Conversation`, and `Department Broadcast` into a modal-style compose surface
+  - kept the empty thread state lightweight and messenger-like instead of filling it with permanent admin/utility cards
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-14 - Messages density tuned for more realistic desktop messenger feel
+- Scope: `site-bulletin/resources/views/messages/_shell.blade.php`
+- Reason: after the shell redesign, the inbox and thread still felt too spacious compared with common desktop messaging products.
+- Change:
+  - reduced inbox column width slightly
+  - tightened chat row padding, avatar size, filter chip sizing, and search bar height
+  - tightened thread header spacing, badge spacing, message bubble padding, and composer height
+  - reduced empty-state vertical footprint so the main pane feels less like a landing page
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-15 - Message attachments added for files and images
+- Scope: `site-bulletin/app/Http/Controllers/Messaging/ConversationController.php`, `site-bulletin/app/Http/Controllers/Messaging/MessageController.php`, `site-bulletin/app/Http/Controllers/Messaging/MessageAttachmentController.php`, `site-bulletin/app/Http/Requests/ConversationStoreRequest.php`, `site-bulletin/app/Http/Requests/MessageStoreRequest.php`, `site-bulletin/app/Models/Message.php`, `site-bulletin/app/Models/MessageAttachment.php`, `site-bulletin/resources/views/messages/_shell.blade.php`, `site-bulletin/routes/web.php`, `site-bulletin/database/migrations/2026_03_15_120000_make_message_body_nullable.php`, `site-bulletin/database/migrations/2026_03_15_120100_create_message_attachments_table.php`
+- Reason: users needed to be able to attach images and files inside the messenger instead of being limited to text-only messages.
+- Change:
+  - added `message_attachments` persistence and a download controller/route for secured attachment access
+  - made message body nullable so attachment-only messages are valid
+  - extended both conversation creation and reply flows to accept up to 5 uploaded files
+  - added file pickers to the thread composer and new-chat forms
+  - rendered attachment cards inside the thread and improved inbox previews for attachment-only messages
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/Messaging/MessageAttachmentTest.php`
+
+## 2026-03-15 - Inline image previews added to message threads
+- Scope: `site-bulletin/app/Http/Controllers/Messaging/MessageAttachmentController.php`, `site-bulletin/app/Models/MessageAttachment.php`, `site-bulletin/resources/views/messages/_shell.blade.php`, `site-bulletin/routes/web.php`, `site-bulletin/tests/Feature/Messaging/MessageAttachmentTest.php`
+- Reason: image attachments were only available as downloads, which made the messenger feel incomplete compared with standard chat products.
+- Change:
+  - added a secured inline preview route for image attachments stored on the private attachments disk
+  - added a preview URL helper to message attachments
+  - rendered image attachments as inline thumbnails/cards inside the thread while keeping non-image files as download cards
+  - added test coverage for authorized inline image preview access
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/Messaging/MessageAttachmentTest.php`
+
+## 2026-03-15 - Dashboard trend scale switching changed to client-side interaction
+- Scope: `site-bulletin/resources/views/dashboard/partials/trend-panels.blade.php`
+- Reason: switching between `7d`, `24h`, and `3h` was reloading the whole dashboard, when only the chart block needed to change.
+- Change:
+  - replaced dashboard trend scale links with client-side Alpine state toggles
+  - pre-rendered employee and manager trend variants for each supported scale and switched them with `x-show`
+  - kept the trend summaries aligned with the selected employee scale without navigating away from the page
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan view:clear`
+
+## 2026-03-16 - Performance simulation unified around 15-minute samples with explicit backfill command
+- Scope: `site-bulletin/app/Services/DemoOperationsSimulationService.php`, `site-bulletin/app/Console/Commands/BackfillDemoOperationsData.php`, `site-bulletin/app/Console/Kernel.php`, `site-bulletin/app/Http/Controllers/Public/DashboardController.php`, `site-bulletin/database/seeders/DatabaseSeeder.php`, `site-bulletin/tests/Feature/Analytics/DemoBackfillOpsDataCommandTest.php`
+- Reason: performance and quality charts needed a single source of truth instead of mixing frozen seed windows, snapshot fallbacks, and synthetic short-window behavior.
+- Change:
+  - added a deterministic simulation service that generates user performance samples in 15-minute intervals
+  - made weekly performance snapshots derive from those samples instead of being seeded independently
+  - added `php artisan demo:backfill-ops-data` for explicit demo refresh/backfill runs
+  - scheduled the backfill command every 15 minutes and added a dashboard freshness check so the sample window can catch up to current local time
+  - switched the database seeder to use the same simulation service rather than duplicating sample-generation logic
+  - kept ticket/SLA analytics on their existing pipeline so the new performance refresh does not silently overwrite unrelated department metric fixtures
+- Validation:
+  - `php artisan test tests/Feature/Analytics/DemoBackfillOpsDataCommandTest.php tests/Feature/Analytics/DepartmentMetricsCommandTest.php tests/Feature/DashboardTrendPanelsTest.php`
+  - `php artisan demo:backfill-ops-data --refresh --weeks=1 --end="2026-03-16 12:10:00"`
+
+## 2026-03-16 - SLA simulation added to demo backfill pipeline
+- Scope: `site-bulletin/app/Services/DemoTicketLifecycleSimulationService.php`, `site-bulletin/app/Console/Commands/BackfillDemoOperationsData.php`, `site-bulletin/app/Models/Ticket.php`, `site-bulletin/database/migrations/2026_03_16_120000_add_simulation_key_to_tickets_table.php`, `site-bulletin/database/seeders/DatabaseSeeder.php`, `site-bulletin/tests/Feature/Analytics/DemoBackfillOpsDataCommandTest.php`
+- Reason: ticket/SLA dashboards were still relying on static seeded timelines, so the demo could drift away from current time even after performance samples were refreshed.
+- Change:
+  - added a deterministic SLA simulation service that rebuilds a rolling window of demo tickets using stable simulation keys
+  - generated realistic ticket status-change trails, comments, final statuses, and breach flags from the same simulation clock used by the demo refresh flow
+  - extended `demo:backfill-ops-data` so one command now refreshes both performance samples and SLA ticket timelines
+  - added `simulation_key` to tickets so simulated records can be safely replaced without touching manual or test-created tickets
+  - updated the seeder to layer current simulated SLA activity on top of the baseline seeded ticket set
+- Validation:
+  - `php artisan migrate`
+  - `php artisan test tests/Feature/Analytics/DemoBackfillOpsDataCommandTest.php tests/Feature/Analytics/DepartmentMetricsCommandTest.php tests/Feature/DashboardTrendPanelsTest.php`
+  - `php artisan demo:backfill-ops-data --refresh --weeks=1 --ticket-days=7 --end="2026-03-16 12:10:00"`
+
+## 2026-03-16 - Application README moved into Laravel app folder
+- Scope: `README.md`, `site-bulletin/README.md`
+- Reason: the full product/setup documentation belonged with the actual Laravel app, while the repository root needed to stay focused on repo-level orientation and governance files.
+- Change:
+  - created a dedicated `site-bulletin/README.md` describing application functionality, demo accounts, setup, running, testing, scheduling, and the demo data model
+  - replaced the root `README.md` with a short repository guide that points contributors to the Laravel app README
+- Validation:
+  - manual documentation review
+
+## 2026-03-17 - Repository scope updated after removing legacy implementation guide
+- Scope: `AGENTS.md`, `README.md`, `site-bulletin/README.md`, `CLEANUP_LOG.md`
+- Reason: the `Site Bulletin Implementation Guide/` folder was no longer used by the application runtime or current workflow, so contributor guidance and repo documentation needed to match the reduced scope.
+- Change:
+  - removed implementation-guide references from repo governance and README files
+  - narrowed repository guidance to the Laravel app plus supporting data/log files
+  - recorded the cleanup so future contributors do not reintroduce the removed folder by assumption
+- Validation:
+  - manual documentation review
+
+## 2026-03-17 - Primary navigation icons refreshed
+- Scope: `site-bulletin/resources/views/components/nav-icon.blade.php`
+- Reason: the existing primary navigation icons looked too generic and visually heavy, especially in the mobile bottom navigation.
+- Change:
+  - replaced the filled icon set with cleaner stroke-based icons for dashboard, announcements, messages, knowledge, tasks, profile, and governance
+  - kept the shared nav icon component API unchanged so both sidebar and mobile navigation benefit from the refresh
+  - aligned the icon family visually so active/inactive states read more consistently
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/Messaging tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Mobile bottom navigation styling tightened
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`
+- Reason: after refreshing the icon set, the mobile bottom navigation still needed a clearer active state and tighter spacing to feel more intentional.
+- Change:
+  - increased visual separation between active and inactive tabs with a softer pill treatment, subtle shadow, and stronger contrast
+  - tightened icon/label spacing and slightly adjusted icon sizing for a more balanced mobile rhythm
+  - refined badge placement and bar shadow so the bottom nav feels cleaner and more app-like
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/Messaging tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Mobile tab labels rebalanced
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`
+- Reason: the bottom navigation labels still carried too much equal weight, which made the active tab feel less distinct than standard mobile app navigation.
+- Change:
+  - reduced inactive label emphasis with smaller, lighter typography
+  - increased active label emphasis so the selected tab reads more clearly at a glance
+  - kept the existing icon and badge layout intact
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Active mobile tab icons made more distinct
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`
+- Reason: after improving label emphasis, the selected mobile tab still benefited from stronger icon contrast relative to inactive tabs.
+- Change:
+  - gave active mobile icons stronger blue emphasis
+  - reduced inactive icon contrast so the selected destination stands out faster
+  - kept the bottom navigation structure and badge behavior unchanged
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/PublicDashboardNewsWidgetTest.php`

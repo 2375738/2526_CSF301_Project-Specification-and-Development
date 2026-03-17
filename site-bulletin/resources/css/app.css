@@ -12,6 +12,7 @@
       linear-gradient(120deg, #7ba764 0%, #92c971 36%, #e5b67a 72%, #ae855d 100%);
     background-attachment: fixed;
     background-size: cover;
+    animation: cwl1-bg-drift 28s ease-in-out infinite alternate;
   }
 
   .cwl1-noise {
@@ -28,6 +29,22 @@
       radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.35) 1px, transparent 0);
     background-size: 4px 4px;
     mix-blend-mode: multiply;
+  }
+
+  .cwl1-noise::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.26;
+    background-image:
+      radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.56) 0 1.7px, transparent 2.2px),
+      radial-gradient(circle at 74% 18%, rgba(191, 219, 254, 0.5) 0 1.7px, transparent 2.2px),
+      radial-gradient(circle at 82% 62%, rgba(255, 255, 255, 0.36) 0 1.45px, transparent 2px),
+      radial-gradient(circle at 28% 78%, rgba(191, 219, 254, 0.42) 0 1.45px, transparent 2px),
+      linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.08) 48%, transparent 100%);
+    background-size: 250px 250px, 310px 310px, 380px 380px, 330px 330px, 100% 100%;
+    animation: cwl1-atmosphere-drift 28s linear infinite;
   }
 
   .chart-line-animate {
@@ -67,6 +84,24 @@
   .badge-pulse-soft {
     animation: badge-pulse 1.8s ease-in-out infinite;
   }
+
+  .site-landing-hero .landing-wave-slow {
+    animation: landing-wave-slow 18s ease-in-out infinite alternate;
+    transform-origin: center;
+  }
+
+  .site-landing-hero .landing-wave-fast {
+    animation: landing-wave-fast 12s ease-in-out infinite alternate;
+    transform-origin: center;
+  }
+
+  .site-landing-hero .landing-dot-cluster-a {
+    animation: landing-dots-float-a 9s ease-in-out infinite;
+  }
+
+  .site-landing-hero .landing-dot-cluster-b {
+    animation: landing-dots-float-b 11s ease-in-out infinite;
+  }
 }
 
 @keyframes chart-draw {
@@ -99,5 +134,70 @@
   }
   50% {
     transform: scale(1.08);
+  }
+}
+
+@keyframes cwl1-bg-drift {
+  0% {
+    background-position: 75% 10%, 48% 66%, 14% 88%, 0% 0%;
+  }
+  100% {
+    background-position: 71% 13%, 52% 62%, 18% 84%, 100% 100%;
+  }
+}
+
+@keyframes cwl1-atmosphere-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-16px, 12px, 0);
+  }
+  100% {
+    transform: translate3d(18px, -14px, 0);
+  }
+}
+
+@keyframes landing-wave-slow {
+  from {
+    transform: translateX(-10px) translateY(0);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateX(12px) translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes landing-wave-fast {
+  from {
+    transform: translateX(8px) translateY(2px);
+    opacity: 0.45;
+  }
+  to {
+    transform: translateX(-12px) translateY(-3px);
+    opacity: 0.85;
+  }
+}
+
+@keyframes landing-dots-float-a {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate3d(-10px, 6px, 0);
+    opacity: 0.95;
+  }
+}
+
+@keyframes landing-dots-float-b {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate3d(12px, -8px, 0);
+    opacity: 0.8;
   }
 }

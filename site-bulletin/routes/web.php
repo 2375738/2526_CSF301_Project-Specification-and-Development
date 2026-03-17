@@ -16,6 +16,7 @@ use App\Http\Controllers\Public\TicketStatusController;
 use App\Http\Controllers\Public\TicketViewController;
 use App\Http\Controllers\Public\SupportTriageBoardController;
 use App\Http\Controllers\Messaging\ConversationController;
+use App\Http\Controllers\Messaging\MessageAttachmentController;
 use App\Http\Controllers\Messaging\MessageController;
 use Illuminate\Support\Facades\Route;
 
@@ -74,6 +75,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('messages')->name('messages.')->group(function () {
         Route::get('/', [ConversationController::class, 'index'])->name('index');
         Route::post('/', [ConversationController::class, 'store'])->name('store');
+        Route::get('/attachments/{attachment}', [MessageAttachmentController::class, 'download'])->name('attachments.download');
+        Route::get('/attachments/{attachment}/preview', [MessageAttachmentController::class, 'preview'])->name('attachments.preview');
         Route::get('/{conversation}', [ConversationController::class, 'show'])->name('show');
         Route::patch('/{conversation}/lock', [ConversationController::class, 'updateLock'])->name('lock');
         Route::post('/{conversation}/messages', [MessageController::class, 'store'])->name('messages.store');

@@ -7,7 +7,7 @@
   <style>[x-cloak] { display: none !important; }</style>
   @vite(['resources/css/app.css','resources/js/app.js'])
 </head>
-<body class="cwl1-bg cwl1-noise text-gray-900">
+<body class="cwl1-bg cwl1-noise overflow-x-hidden text-gray-900">
   @php
     $showGovernance = auth()->check() && auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin');
     $user = auth()->user();
@@ -148,7 +148,7 @@
       </aside>
     @endauth
 
-    <div class="flex min-h-screen flex-1 flex-col">
+    <div class="flex min-h-screen min-w-0 flex-1 flex-col">
       <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
         <div class="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4">
           @guest
@@ -241,8 +241,8 @@
         </div>
       </header>
 
-      <main class="flex-1 w-full">
-        <div class="mx-auto w-full max-w-7xl px-4 py-6 pb-24 md:pb-6">
+      <main class="flex-1 w-full min-w-0 overflow-x-hidden">
+        <div class="mx-auto w-full min-w-0 max-w-7xl px-4 py-6 pb-24 md:pb-6">
           @if (session('status'))
             <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               {{ session('status') }}
@@ -259,23 +259,23 @@
     </div>
   </div>
   @auth
-    <nav class="md:hidden fixed bottom-0 inset-x-0 border-t border-slate-200 bg-white/95 backdrop-blur z-40">
-      <div class="grid grid-cols-5 gap-1 px-2 py-2">
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div class="grid grid-cols-5 gap-1 px-2 py-2.5">
         @foreach ($mobileNavItems as $item)
           <a
             href="{{ $item['route'] }}"
-            class="rounded-xl px-2 py-2 text-xs font-medium transition {{ $item['active'] ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100' }}"
+            class="rounded-2xl px-1.5 py-2 text-[10px] tracking-tight transition {{ $item['active'] ? 'bg-gradient-to-b from-blue-50 to-blue-100/90 text-blue-700 shadow-sm ring-1 ring-blue-100' : 'text-slate-400 hover:bg-slate-100/90 hover:text-slate-700' }}"
           >
-            <span class="mx-auto flex w-fit flex-col items-center gap-1">
-              <span class="relative inline-flex">
-                <x-nav-icon :name="$item['icon']" class="h-5 w-5" />
+            <span class="mx-auto flex w-full flex-col items-center gap-1.5">
+              <span class="relative inline-flex items-center justify-center rounded-2xl {{ $item['active'] ? 'bg-white/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]' : 'p-1.5' }}">
+                <x-nav-icon :name="$item['icon']" class="{{ $item['active'] ? 'h-5.5 w-5.5 text-blue-700' : 'h-5 w-5 text-slate-400' }}" />
                 @if (($item['badge'] ?? 0) > 0)
-                  <span class="badge-pulse-soft absolute -right-2 -top-2 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                  <span class="badge-pulse-soft absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white shadow-sm">
                     {{ $item['badge'] > 9 ? '9+' : $item['badge'] }}
                   </span>
                 @endif
               </span>
-              <span>{{ $item['label'] }}</span>
+              <span class="leading-none {{ $item['active'] ? 'font-semibold text-blue-700' : 'font-medium text-slate-500' }}">{{ $item['label'] }}</span>
             </span>
           </a>
         @endforeach
