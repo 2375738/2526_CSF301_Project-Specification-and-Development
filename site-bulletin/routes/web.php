@@ -9,6 +9,7 @@ use App\Http\Controllers\Public\GovernanceController;
 use App\Http\Controllers\Public\ReportTicketController;
 use App\Http\Controllers\Public\RoleChangeRequestController;
 use App\Http\Controllers\Public\KnowledgeSnippetController;
+use App\Http\Controllers\Public\MyWorkController;
 use App\Http\Controllers\Public\TicketAttachmentController;
 use App\Http\Controllers\Public\TicketApprovalQueueController;
 use App\Http\Controllers\Public\TicketCommentController;
@@ -24,6 +25,7 @@ Route::get('/', DashboardController::class)->name('home');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/my-work', MyWorkController::class)->name('my-work.index');
 
     Route::prefix('tickets')->name('tickets.')->group(function () {
         Route::get('/', [TicketViewController::class, 'index'])->name('index');

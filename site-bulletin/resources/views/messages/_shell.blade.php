@@ -79,8 +79,8 @@
     </div>
   @endif
 
-  <div class="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-    <aside class="min-w-0 rounded-[24px] border border-slate-200 bg-white shadow-sm {{ $selectedConversation ? 'hidden xl:block' : '' }}">
+  <div class="grid gap-4 {{ $selectedConversation ? 'xl:grid-cols-[420px_minmax(0,1fr)] 2xl:grid-cols-[440px_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)]' }}">
+    <aside class="min-w-0 rounded-[24px] border border-slate-200 bg-white shadow-sm {{ $selectedConversation ? 'hidden xl:block xl:messenger-inbox-collapse' : 'w-full' }}">
       <div class="border-b border-slate-200 px-4 py-4">
         <div class="flex items-start justify-between gap-4">
           <div>
@@ -88,8 +88,8 @@
             <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Recent Chats</h1>
             <p class="mt-1 text-sm text-slate-500">{{ $unreadConversationCount ?? 0 }} unread conversation{{ ($unreadConversationCount ?? 0) === 1 ? '' : 's' }}.</p>
           </div>
-          <button type="button" x-on:click="composeOpen = true" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900" aria-label="New chat">
-            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <button type="button" x-on:click="composeOpen = true" class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 hover:text-blue-800" aria-label="New chat">
+            <svg class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M9.25 3a.75.75 0 00-1.5 0v5.25H2.5a.75.75 0 000 1.5h5.25V15a.75.75 0 001.5 0V9.75H14.5a.75.75 0 000-1.5H9.25V3z" />
             </svg>
           </button>
@@ -204,7 +204,7 @@
       </div>
     </aside>
 
-    <section class="min-w-0 rounded-[24px] border border-slate-200 bg-white shadow-sm {{ $selectedConversation ? 'block' : 'hidden xl:block' }}">
+    <section class="min-w-0 {{ $selectedConversation ? 'block rounded-[24px] border border-slate-200 bg-white shadow-sm messenger-thread-enter' : 'hidden' }}">
       @if ($selectedConversation)
         @php
           $selectedTitle = $conversationTitle($selectedConversation);
@@ -351,27 +351,6 @@
             Replies are locked for this conversation. Contact the thread owner if you need changes.
           </div>
         @endcan
-      @else
-        <div class="flex h-full min-h-[32rem] flex-col items-center justify-center px-6 py-10 text-center">
-          <div class="flex h-20 w-20 items-center justify-center rounded-[24px] bg-slate-900 text-white shadow-sm">
-            <svg class="h-9 w-9" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M2 5.75A1.75 1.75 0 013.75 4h12.5A1.75 1.75 0 0118 5.75v7.5A1.75 1.75 0 0116.25 15H6.31l-2.78 2.29A.75.75 0 012 16.71V5.75z" />
-            </svg>
-          </div>
-          <p class="mt-6 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Messenger</p>
-          <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Choose a chat or start a new one</h2>
-          <p class="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-            The inbox on the left works like a familiar chat list. Open an existing thread, or start a new one from the plus button in the inbox header.
-          </p>
-          @can('create', App\Models\Conversation::class)
-            <button type="button" x-on:click="composeOpen = true" class="mt-5 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M9.25 3a.75.75 0 00-1.5 0v5.25H2.5a.75.75 0 000 1.5h5.25V15a.75.75 0 001.5 0V9.75H14.5a.75.75 0 000-1.5H9.25V3z" />
-              </svg>
-              New chat
-            </button>
-          @endcan
-        </div>
       @endif
     </section>
   </div>

@@ -1986,3 +1986,182 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - kept the bottom navigation structure and badge behavior unchanged
 - Validation:
   - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Fixed active mobile tab icon disappearing
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`
+- Reason: the selected mobile tab icon could visually disappear because its active-state size utility was not resolving consistently, unlike the desktop collapsed nav.
+- Change:
+  - replaced the active mobile icon size with a standard supported size utility
+  - kept the active/inactive visual hierarchy the same while restoring reliable icon rendering
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Employee dashboard summary row removed and attention cards made actionable
+- Scope: `site-bulletin/resources/views/dashboard/partials/content.blade.php`, `site-bulletin/resources/views/dashboard/partials/my-work-today.blade.php`, `site-bulletin/app/Http/Controllers/Public/TicketViewController.php`
+- Reason: the employee-only dashboard still showed an inventory-style summary row with little decision value, and the `Attention Needed` panel looked static despite being the most obvious action area.
+- Change:
+  - removed the authenticated summary-card row for employee dashboards so the main flow stays focused on current work, tickets, and performance
+  - converted `Attention Needed` rows into clickable ticket filters for waiting-on-you, breached, and unassigned cases
+  - added hover lift/arrow feedback and short supporting copy so the panel reads like an actionable work queue instead of passive stats
+  - added an `unassigned` filter to the ticket index so the dashboard links land on the correct subset
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-17 - Removed redundant employee weekly history cards
+- Scope: `site-bulletin/resources/views/dashboard/partials/content.blade.php`
+- Reason: the employee dashboard already has an interactive performance trend section, so the static `Performance (Last 6 Weeks)` card grid was duplicating history with lower quality and adding unnecessary page length.
+- Change:
+  - removed the employee-only weekly history card block and its placeholder coursework note
+  - left the trend charts as the single historical performance view for employees
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+
+## 2026-03-17 - Introduced employee My Work area and removed announcements from primary nav
+- Scope: `site-bulletin/routes/web.php`, `site-bulletin/app/Http/Controllers/Public/MyWorkController.php`, `site-bulletin/resources/views/my-work/index.blade.php`, `site-bulletin/resources/views/layouts/app.blade.php`, `site-bulletin/resources/views/components/nav-icon.blade.php`, `site-bulletin/resources/views/dashboard/partials/my-work-today.blade.php`, `site-bulletin/resources/views/dashboard/partials/trend-panels.blade.php`, `site-bulletin/resources/views/dashboard/partials/content.blade.php`
+- Reason: detailed productivity and quality analytics were taking over the employee dashboard, while `Announcements` as a top-level tab duplicated the dashboard news feed and notification bell.
+- Change:
+  - added a dedicated employee `My Work` route and page for detailed throughput and quality analytics
+  - moved the employee performance trend section off the main dashboard and into the new `My Work` page
+  - made the employee throughput and quality summary cards on the dashboard clickable so they deep-link into detailed `My Work` sections
+  - removed `Announcements` from the primary desktop/mobile tab bars and kept updates discoverable through the bell plus dashboard feed
+  - removed the second large dashboard `Announcements` block so the home page no longer repeats the same news content twice
+  - added a dedicated `My Work` nav icon and employee-specific nav structure
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Employee summary cards made consistent and productivity wording normalized
+- Scope: `site-bulletin/resources/views/dashboard/partials/my-work-today.blade.php`, `site-bulletin/resources/views/my-work/index.blade.php`
+- Reason: the `My Work Today` summary row mixed clickable and non-clickable cards while using `throughput` wording in some places and `quality score` wording in others, which made the block feel inconsistent.
+- Change:
+  - made all four employee summary cards clickable with matching hover behavior and action labels
+  - routed `Unread Updates` to the updates feed and `Open Tickets` to the ticket queue so the row behaves consistently
+  - renamed employee-facing throughput labels to `Productivity Score` / `Target productivity` where the language is more natural
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Desktop sidebar locked in place on wide screens
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`
+- Reason: on wide screens the primary navigation could scroll off-screen with the page content, forcing users to scroll back up just to change tabs, unlike the persistent mobile tab bar.
+- Change:
+  - made the authenticated desktop sidebar sticky for large screens so the primary tabs remain available while the main content scrolls
+  - preserved the existing mobile behavior and the desktop collapse interaction
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-17 - Messaging inbox column narrowed on wide screens
+- Scope: `site-bulletin/resources/views/messages/_shell.blade.php`
+- Reason: the wide-screen inbox pane was taking more width than the chat list needed, which left the main conversation area unnecessarily compressed.
+- Change:
+  - reduced the desktop inbox column width from `340px` to `300px` on xl screens
+  - added a slightly looser `320px` width only for very large `2xl` screens
+  - left mobile and drilled-in conversation behavior unchanged
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Fixed duplicate shell rendering on profile page
+- Scope: `site-bulletin/resources/views/profile/edit.blade.php`, `site-bulletin/tests/Feature/ProfileTest.php`
+- Reason: the profile page was rendering the full application shell multiple times because the Blade view extended the app layout more than once.
+- Change:
+  - removed duplicate `@extends('layouts.app')` directives from the profile edit view
+  - added a regression check to confirm the profile page renders only one shell header/footer
+- Validation:
+  - `php artisan test tests/Feature/ProfileTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php`
+
+## 2026-03-17 - Employee performance wording and status colors aligned to targets
+- Scope: `site-bulletin/resources/views/dashboard/partials/trend-panels.blade.php`, `site-bulletin/resources/views/my-work/index.blade.php`
+- Reason: employee-facing performance areas still used `throughput` terminology in key places and the summary cards did not visually communicate whether the user was actually meeting target.
+- Change:
+  - replaced the remaining employee `throughput` wording in the `My Work` page copy with `productivity`
+  - changed the employee trend summary cards from static `Peak Throughput` / `Rank Trend` labels to `Current Productivity` / `Current Quality`
+  - added target-aware card states so employee productivity and quality cards now switch between green, amber, and red depending on current performance against target
+  - preserved best-in-window context as supporting detail instead of making it the primary metric
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-17 - Messaging inbox widened and empty state reduced
+- Scope: `site-bulletin/resources/views/messages/_shell.blade.php`
+- Reason: on wide screens the empty conversation area was taking too much space for a low-information placeholder while the inbox pane felt tighter than necessary.
+- Change:
+  - widened the desktop inbox column so the chat list has more useful space
+  - reduced the empty conversation view to a compact centered card instead of a large full-panel placeholder
+  - kept a single `New chat` action in the empty state that opens the existing start-conversation prompt
+- Follow-up:
+  - increased the inbox width again after review because the first pass was still too conservative
+  - reduced the empty-state card further and moved it higher so the right side no longer feels dominated by a start-conversation placeholder
+  - removed the outer bordered white thread frame entirely in the empty state so only the compact starter card remains on the right
+  - removed the redundant `Choose a chat` empty-state card entirely once the inbox `+` action was made prominent enough to serve as the single start-conversation entry point
+  - changed the empty desktop messages layout to a single wider inbox so the page no longer reserves a large blank second pane when no chat is selected
+  - made the empty desktop state a true full-width inbox and added lightweight inbox/thread transition animations so opening a conversation feels like a drill-in instead of a layout jump
+- Validation:
+  - `php artisan test tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-03-19 - Fixed manager dashboard bottom section shifting to the right
+- Scope: `site-bulletin/resources/views/dashboard/partials/trend-panels.blade.php`
+- Reason: the manager dashboard was rendering incorrectly near the bottom of the page because an extra closing wrapper inside the `Daily Breach Drilldown` block could pull later layout content, including the footer, into the wrong flow.
+- Change:
+  - removed the stray `</div>` from the manager breach drilldown section so the dashboard content tree stays balanced
+  - restored normal page flow for the manager dashboard footer and lower sections
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/ProfileTest.php tests/Feature/PublicDashboardNewsWidgetTest.php`
+
+## 2026-04-30 - Dashboard demo data source-of-truth alignment
+- Scope: `site-bulletin/app/Services/DemoOperationsSimulationService.php`, `site-bulletin/app/Services/DemoTicketLifecycleSimulationService.php`, `site-bulletin/app/Http/Controllers/Public/DashboardController.php`, `site-bulletin/app/Http/Controllers/Admin/AnalyticsController.php`, dashboard/analytics tests.
+- Reason: employee and manager performance dashboards needed to use realistic employee 15-minute productivity and quality samples as the canonical data source, while ticket/SLA demo data needed less breach-heavy operational patterns.
+- Change:
+  - limited generated performance samples to employee users and added deterministic shift-window attendance gaps
+  - made manager dashboard department productivity, quality, active headcount, and current-shift unit totals derive from employee `performance_samples`
+  - tuned rolling demo ticket priorities, statuses, first-response breaches, and resolution breaches toward more realistic operational distributions
+  - fixed the analytics dashboard crash caused by enum-cast ticket priorities being used directly as collection keys
+  - added regression tests for employee-only sample generation, manager sample aggregation, and analytics enum handling
+- Validation:
+  - `php artisan test tests/Feature/Analytics/DemoBackfillOpsDataCommandTest.php tests/Feature/DashboardTrendPanelsTest.php tests/Feature/Analytics/AnalyticsDashboardTest.php`
+
+## 2026-04-30 - Operations UI/UX polish and data provenance
+- Scope: `site-bulletin/resources/css/app.css`, `site-bulletin/resources/views/layouts/app.blade.php`, dashboard partials, analytics/profile/knowledge/ticket views, navigation tests.
+- Reason: the prototype needed calmer production-facing visuals, clearer ticket/analytics navigation, explicit demo data provenance, and a fix for an Alpine tooltip crash on dashboard charts.
+- Change:
+  - replaced the animated multi-color page background with a quieter operations-tool surface
+  - renamed primary navigation from `Tasks` to `Tickets` and exposed `Analytics` for manager/admin roles
+  - added source/update labels to employee and manager dashboard performance areas
+  - guarded chart tooltip style bindings so Alpine no longer reads coordinates from null tooltip state
+  - toned down breach/severity colors and simplified the profile page into operational work-profile and account settings sections
+  - added a decision queue to analytics so managers see breach pressure, response load, and resolution drag before raw tables
+- Validation:
+  - `php artisan test tests/Feature/LayoutNavigationTest.php tests/Feature/ProfileTest.php tests/Feature/DashboardTrendPanelsTest.php tests/Feature/Analytics/AnalyticsDashboardTest.php`
+  - `npm run build`
+  - Playwright smoke check against `http://127.0.0.1:8000/`, `/profile`, and `/analytics` as `manager@example.com`; all expected headings/navigation present and no browser console/page errors.
+
+## 2026-04-30 - Actionable notifications, ticket timeline, and mobile icon polish
+- Scope: notification dropdown, notification payloads, ticket detail timeline, primary navigation marks, and reduced-motion handling.
+- Reason: the app needed clearer next-action notifications, a more employee-readable ticket history, and less icon-heavy mobile navigation.
+- Change:
+  - replaced the bell-only notification dropdown with an `Alerts` control that shows unread counts, notification type, direct next-action labels, and full-width accessible action buttons
+  - added action labels and more direct destinations for ticket, announcement, and message notifications
+  - replaced the status-only ticket timeline with a combined ticket timeline containing ticket creation, visible status changes, public/internal-visible updates, and visible evidence uploads
+  - replaced the navigation glyphs with bolder, simpler SVG icons for mobile and collapsed sidebar states
+  - added reduced-motion handling for dashboard, badge, chart, and messaging animations
+- Validation:
+  - `php artisan test tests/Feature/Notifications/ActionableNotificationDropdownTest.php tests/Feature/Tickets/TicketLifecycleTransparencyTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/Notifications/NotificationPreferencesDispatchTest.php`
+  - `npm run build`
+  - Follow-up validation after icon correction: `php artisan test tests/Feature/LayoutNavigationTest.php`; `npm run build`
+  - Follow-up validation after icon polish: `php artisan test tests/Feature/LayoutNavigationTest.php`; `npm run build`
+
+## 2026-04-30 - Ticket index CTA polish
+- Scope: `site-bulletin/resources/views/tickets/index.blade.php`
+- Reason: the `Report issue` button on the ticket index header was too pill-shaped and narrow on mobile, causing an awkward wrapped label and a weak visual relationship to the page header.
+- Change:
+  - changed the ticket header action group to stack cleanly on small screens and align to the right on wider screens
+  - replaced the oversized pill CTA with a compact rounded rectangular button, plus mark, stable minimum height, and focus ring
+  - matched secondary ticket actions to the same button height and radius system
+- Validation:
+  - `php artisan test tests/Feature/Tickets/TicketIndexViewTest.php`
+  - `npm run build`

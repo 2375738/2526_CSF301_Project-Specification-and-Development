@@ -7,26 +7,26 @@
     @php
       $queueDepartmentId = $managerAttentionQueue['department_id'] ?? null;
     @endphp
-    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 class="text-lg font-semibold text-slate-900">Attention Queue</h2>
-          <p class="mt-1 text-sm text-slate-600">The items most likely to need intervention during the current shift.</p>
+          <p class="mt-1 text-sm text-slate-600">Current shift decision queue from simulated live tickets, messages, and role requests.</p>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
-            <p class="text-xs font-semibold uppercase tracking-wide text-rose-700">Breached Tickets</p>
-            <p class="mt-1 text-2xl font-semibold text-rose-900">{{ $managerAttentionQueue['breached_count'] }}</p>
+          <div class="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+            <p class="text-xs font-semibold uppercase tracking-wide text-orange-700">Breached Tickets</p>
+            <p class="mt-1 text-2xl font-semibold text-orange-900">{{ $managerAttentionQueue['breached_count'] }}</p>
           </div>
-          <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Waiting On Employee</p>
             <p class="mt-1 text-2xl font-semibold text-amber-900">{{ $managerAttentionQueue['waiting_count'] }}</p>
           </div>
-          <div class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
             <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Unread Messages</p>
             <p class="mt-1 text-2xl font-semibold text-blue-900">{{ $managerAttentionQueue['unread_count'] }}</p>
           </div>
-          <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
             <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Pending Requests</p>
             <p class="mt-1 text-2xl font-semibold text-emerald-900">{{ $managerAttentionQueue['pending_request_count'] }}</p>
           </div>
@@ -41,7 +41,7 @@
           </div>
           <div class="mt-3 space-y-2">
             @forelse ($managerAttentionQueue['breached_tickets'] as $ticket)
-              <a href="{{ route('tickets.show', $ticket['id']) }}" class="block rounded-xl border border-rose-200 bg-white px-4 py-3 transition hover:border-rose-300 hover:bg-rose-50">
+              <a href="{{ route('tickets.show', $ticket['id']) }}" class="block rounded-xl border border-orange-200 bg-white px-4 py-3 transition hover:border-orange-300 hover:bg-orange-50">
                 <div class="flex items-start justify-between gap-3">
                   <div>
                     <p class="font-semibold text-slate-900">{{ $ticket['title'] }}</p>

@@ -26,8 +26,9 @@ class NewMessage extends Notification implements ShouldQueue
         return [
             'title' => 'New Message',
             'message' => 'From ' . $this->message->sender->name . ': ' . \Illuminate\Support\Str::limit($this->message->body, 50),
-            'url' => route('messages.index', ['conversation' => $this->message->conversation_id]),
+            'url' => route('messages.show', $this->message->conversation_id),
             'type' => 'message',
+            'action_label' => 'Reply',
             'sender_id' => $this->message->sender_id,
         ];
     }

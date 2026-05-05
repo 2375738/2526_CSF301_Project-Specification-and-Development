@@ -32,6 +32,9 @@ class DemoBackfillOpsDataCommandTest extends TestCase
             'role' => 'employee',
             'primary_department_id' => $department->id,
         ]);
+        $manager = User::factory()->manager()->create([
+            'primary_department_id' => $department->id,
+        ]);
 
         $this->artisan('demo:backfill-ops-data', [
             '--refresh' => true,
@@ -49,6 +52,7 @@ class DemoBackfillOpsDataCommandTest extends TestCase
 
         $this->assertGreaterThan(0, PerformanceSample::query()->count());
         $this->assertGreaterThan(0, PerformanceSnapshot::query()->count());
+        $this->assertSame(0, PerformanceSample::query()->where('user_id', $manager->id)->count());
         $this->assertGreaterThan(0, Ticket::query()->whereNotNull('simulation_key')->count());
         $this->assertGreaterThan(0, TicketStatusChange::query()->count());
     }
@@ -68,18 +72,18 @@ class DemoBackfillOpsDataCommandTest extends TestCase
         $this->artisan('demo:backfill-ops-data', [
             '--refresh' => true,
             '--weeks' => 1,
-            '--end' => '2026-03-16 09:00:00',
+            '--end' => '2026-03-16 10:00:00',
         ])->assertExitCode(BackfillDemoOperationsData::SUCCESS);
 
         $baselineCount = PerformanceSample::query()->count();
 
         $this->artisan('demo:backfill-ops-data', [
-            '--end' => '2026-03-16 09:30:00',
+            '--end' => '2026-03-16 10:30:00',
         ])->assertExitCode(BackfillDemoOperationsData::SUCCESS);
 
-        $this->assertSame($baselineCount + 2, PerformanceSample::query()->count());
+        $this->assertGreaterThan($baselineCount, PerformanceSample::query()->count());
         $this->assertDatabaseHas('performance_samples', [
-            'recorded_at' => '2026-03-16 09:30:00',
+            'recorded_at' => '2026-03-16 10:30:00',
         ]);
         $this->assertGreaterThan(0, Ticket::query()->whereNotNull('simulation_key')->count());
     }

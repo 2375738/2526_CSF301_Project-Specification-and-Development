@@ -7,7 +7,7 @@
         Back to dashboard
       </a>
       <a href="{{ route('tickets.index') }}" class="text-sm font-medium text-slate-600 hover:text-slate-900">
-        View tasks
+        View tickets
       </a>
     </div>
 

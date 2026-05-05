@@ -313,6 +313,7 @@ class DashboardController extends Controller
 
         $departmentUserIds = $this->departmentUserIds($departmentId);
         $observedTeamSize = User::query()
+            ->where('role', 'employee')
             ->where(function ($query) use ($departmentId) {
                 $query->where('primary_department_id', $departmentId)
                     ->orWhereHas('departments', fn ($departmentQuery) => $departmentQuery
@@ -358,12 +359,17 @@ class DashboardController extends Controller
 
         $activeSeries = $seriesByScale[$scale] ?? $seriesByScale['7d'];
         $currentPoint = collect($seriesByScale['24h'] ?? [])->last() ?: collect($seriesByScale['7d'] ?? [])->last();
-        $activeEmployees = max(1, $observedTeamSize);
+        $shiftWindowEnd = now()->lessThan($shift['end']) ? now() : $shift['end'];
+        $sampledActiveEmployees = $this->sampledUserCountForWindow($departmentUserIds, $shift['start'], $shiftWindowEnd);
+        $activeEmployees = max(1, $sampledActiveEmployees ?: $observedTeamSize);
         $elapsedHoursForRate = max(0.5, $shift['elapsed_hours']);
         $avgProductivity = round((float) ($currentPoint['productivity'] ?? $targetProductivity), 1);
         $qualityScore = round((float) ($currentPoint['quality'] ?? $targetQuality), 1);
         $shiftTargetUnits = (int) round($activeEmployees * $targetProductivity * $shift['duration_hours']);
-        $actualUnits = (int) round($avgProductivity * $activeEmployees * $elapsedHoursForRate);
+        $sampledUnits = $this->sumSampledUnitsForWindow($departmentUserIds, $shift['start'], $shiftWindowEnd);
+        $actualUnits = $sampledUnits > 0
+            ? $sampledUnits
+            : (int) round($avgProductivity * $activeEmployees * $elapsedHoursForRate);
         $productivityAchievementPct = $targetProductivity > 0
             ? round(($avgProductivity / $targetProductivity) * 100, 1)
             : 0.0;
@@ -791,6 +797,11 @@ class DashboardController extends Controller
             'target_quality_pct' => (float) ($profile['target_quality'] ?? 95),
             'latest_units_per_hour' => $latestUnits,
             'latest_quality_score' => $latestQuality,
+            'units_processed' => $this->sumSampledUnitsForWindow(
+                [$user->id],
+                $shift['start'],
+                now()->lessThan($shift['end']) ? now() : $shift['end']
+            ),
             'throughput_delta' => $latestUnits !== null && $previousUnits !== null
                 ? round($latestUnits - $previousUnits, 1)
                 : null,
@@ -961,6 +972,7 @@ class DashboardController extends Controller
     protected function departmentUserIds(int $departmentId): array
     {
         return User::query()
+            ->where('role', 'employee')
             ->where(function ($query) use ($departmentId) {
                 $query->where('primary_department_id', $departmentId)
                     ->orWhereHas('departments', fn ($departmentQuery) => $departmentQuery
@@ -968,6 +980,37 @@ class DashboardController extends Controller
             })
             ->pluck('id')
             ->all();
+    }
+
+    protected function sumSampledUnitsForWindow(array $userIds, Carbon $start, Carbon $end): int
+    {
+        $userIds = collect($userIds)->filter()->unique()->values()->all();
+
+        if (empty($userIds) || $end->lessThanOrEqualTo($start)) {
+            return 0;
+        }
+
+        $totalUnits = PerformanceSample::query()
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('recorded_at', [$start, $end])
+            ->sum('units_per_hour');
+
+        return (int) round(((float) $totalUnits) / 4);
+    }
+
+    protected function sampledUserCountForWindow(array $userIds, Carbon $start, Carbon $end): int
+    {
+        $userIds = collect($userIds)->filter()->unique()->values()->all();
+
+        if (empty($userIds) || $end->lessThanOrEqualTo($start)) {
+            return 0;
+        }
+
+        return PerformanceSample::query()
+            ->whereIn('user_id', $userIds)
+            ->whereBetween('recorded_at', [$start, $end])
+            ->distinct('user_id')
+            ->count('user_id');
     }
 
     protected function describeEmployeeTicketNextStep(Ticket $ticket): string

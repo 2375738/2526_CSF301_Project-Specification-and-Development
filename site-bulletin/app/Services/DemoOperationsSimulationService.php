@@ -67,6 +67,7 @@ class DemoOperationsSimulationService
 
         $users = User::query()
             ->with(['primaryDepartment', 'departments'])
+            ->where('role', 'employee')
             ->get();
 
         if ($users->isEmpty()) {
@@ -93,6 +94,10 @@ class DemoOperationsSimulationService
             $targetQuality = (float) ($profileDepartment?->target_quality_pct ?: 95.0);
 
             foreach ($timestamps as $recordedAt) {
+                if (! $this->shouldRecordSample($user->id, $recordedAt, $profileDepartment)) {
+                    continue;
+                }
+
                 $upsertRows[] = [
                     'user_id' => $user->id,
                     'recorded_at' => $recordedAt->copy(),
@@ -198,6 +203,41 @@ class DemoOperationsSimulationService
             + ($noise * 0.12);
 
         return round(max(8, min(180, $targetUnits * $factor)), 1);
+    }
+
+    protected function shouldRecordSample(int $userId, Carbon $recordedAt, mixed $department): bool
+    {
+        $shift = $this->assignedShift($userId);
+        $startTime = $shift === 'night'
+            ? ($department?->night_shift_start?->format('H:i') ?: '18:30')
+            : ($department?->day_shift_start?->format('H:i') ?: '10:00');
+        $endTime = $shift === 'night'
+            ? ($department?->night_shift_end?->format('H:i') ?: '04:45')
+            : ($department?->day_shift_end?->format('H:i') ?: '20:00');
+
+        if (! $this->withinShiftWindow($recordedAt, $startTime, $endTime)) {
+            return false;
+        }
+
+        // Keep demo telemetry realistic: employees have occasional missed scan windows.
+        return $this->seededRatio("attendance-{$userId}-{$recordedAt->format('YmdHi')}") > 0.06;
+    }
+
+    protected function assignedShift(int $userId): string
+    {
+        return $this->seededRatio("shift-assignment-{$userId}") > 0.82 ? 'night' : 'day';
+    }
+
+    protected function withinShiftWindow(Carbon $recordedAt, string $startTime, string $endTime): bool
+    {
+        $start = $recordedAt->copy()->setTimeFromTimeString($startTime);
+        $end = $recordedAt->copy()->setTimeFromTimeString($endTime);
+
+        if ($end->lessThanOrEqualTo($start)) {
+            return $recordedAt->greaterThanOrEqualTo($start) || $recordedAt->lessThanOrEqualTo($end);
+        }
+
+        return $recordedAt->betweenIncluded($start, $end);
     }
 
     protected function generateQualityScore(int $userId, Carbon $recordedAt, float $targetQuality): float

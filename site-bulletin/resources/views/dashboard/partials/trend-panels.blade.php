@@ -35,12 +35,12 @@
 @endphp
 
 @auth
-  @if (auth()->user()->isEmployee() && $employeeTrend->isNotEmpty())
+  @if (($showEmployeeTrend ?? false) && auth()->user()->isEmployee() && $employeeTrend->isNotEmpty())
     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
       <header class="flex items-center justify-between">
         <div>
           <h2 class="text-lg font-semibold text-slate-900">Employee Performance Trend</h2>
-          <p class="text-xs text-slate-500">Productivity and quality charts with the same interaction model as the manager view.</p>
+          <p class="text-xs text-slate-500">Source: employee 15-minute samples. Updated {{ now()->format('H:i') }}.</p>
         </div>
       </header>
       @if ($employeeOverview && collect($employeeOverview['series_by_scale'] ?? [])->flatten(1)->isNotEmpty())
@@ -98,8 +98,59 @@
               $employeeProdTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetProductivity - $employeeMinProd) / $employeeProdRange) * $employeePlotHeight));
               $employeeQualityTargetY = $employeePaddingTop + ($employeePlotHeight - ((($employeeTargetQuality - $employeeMinQuality) / $employeeQualityRange) * $employeePlotHeight));
               $employeePeakProductivity = round((float) $employeeSeries->max('productivity'), 1);
+              $employeeLatestProductivity = round((float) ($employeeSeries->last()['productivity'] ?? 0), 1);
               $employeeLatestQuality = round((float) ($employeeSeries->last()['quality'] ?? 0), 1);
               $employeeBestQuality = round((float) $employeeSeries->max('quality'), 1);
+              $employeeProductivityGap = round($employeeLatestProductivity - $employeeTargetProductivity, 1);
+              $employeeQualityGap = round($employeeLatestQuality - $employeeTargetQuality, 1);
+
+              $employeeProductivityStatus = match (true) {
+                  $employeeProductivityGap >= 0 => 'green',
+                  $employeeProductivityGap >= -2 => 'amber',
+                  default => 'red',
+              };
+
+              $employeeQualityStatus = match (true) {
+                  $employeeQualityGap >= 0 => 'green',
+                  $employeeQualityGap >= -1 => 'amber',
+                  default => 'red',
+              };
+
+              $employeeProductivityCardClass = match ($employeeProductivityStatus) {
+                  'green' => 'border-emerald-200 bg-emerald-50',
+                  'amber' => 'border-amber-200 bg-amber-50',
+                  default => 'border-orange-200 bg-orange-50',
+              };
+
+              $employeeProductivityLabelClass = match ($employeeProductivityStatus) {
+                  'green' => 'text-emerald-700',
+                  'amber' => 'text-amber-700',
+                  default => 'text-orange-700',
+              };
+
+              $employeeProductivityValueClass = match ($employeeProductivityStatus) {
+                  'green' => 'text-emerald-950',
+                  'amber' => 'text-amber-950',
+                  default => 'text-orange-950',
+              };
+
+              $employeeQualityCardClass = match ($employeeQualityStatus) {
+                  'green' => 'border-emerald-200 bg-emerald-50',
+                  'amber' => 'border-amber-200 bg-amber-50',
+                  default => 'border-orange-200 bg-orange-50',
+              };
+
+              $employeeQualityLabelClass = match ($employeeQualityStatus) {
+                  'green' => 'text-emerald-700',
+                  'amber' => 'text-amber-700',
+                  default => 'text-orange-700',
+              };
+
+              $employeeQualityValueClass = match ($employeeQualityStatus) {
+                  'green' => 'text-emerald-950',
+                  'amber' => 'text-amber-950',
+                  default => 'text-orange-950',
+              };
             @endphp
           <div x-cloak x-show="activeScale === '{{ $employeeScaleKey }}'" class="space-y-4">
           <div class="grid gap-4 lg:grid-cols-2">
@@ -141,7 +192,7 @@
                     <text x="{{ number_format($x - 12, 2, '.', '') }}" y="{{ $employeeHeight - 6 }}" fill="#64748b" font-size="10">{{ $point['label'] }}</text>
                   @endforeach
                 </svg>
-                <div x-show="active" x-cloak class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow" :style="`left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);`">
+                <div x-show="active" x-cloak class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow" :style="active ? `left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);` : 'display: none;'">
                   <p class="font-semibold text-slate-900" x-text="active?.label"></p>
                   <p class="text-blue-700"><span x-text="active?.value"></span> <span x-text="active?.unit"></span></p>
                 </div>
@@ -186,7 +237,7 @@
                     <text x="{{ number_format($x - 12, 2, '.', '') }}" y="{{ $employeeHeight - 6 }}" fill="#64748b" font-size="10">{{ $point['label'] }}</text>
                   @endforeach
                 </svg>
-                <div x-show="active" x-cloak class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow" :style="`left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);`">
+                <div x-show="active" x-cloak class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow" :style="active ? `left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);` : 'display: none;'">
                   <p class="font-semibold text-slate-900" x-text="active?.label"></p>
                   <p class="text-emerald-700"><span x-text="active?.value"></span><span x-text="active?.unit"></span></p>
                 </div>
@@ -194,19 +245,23 @@
             </div>
           </div>
           <div class="grid gap-3 sm:grid-cols-2">
-        <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-          <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Peak Throughput</p>
-          <p class="mt-1 text-2xl font-semibold text-blue-900">{{ number_format((float) $employeePeakProductivity, 1) }} /hr</p>
-          <p class="text-xs text-blue-700">Highest point in selected trend window</p>
+        <div class="rounded-xl border px-4 py-3 {{ $employeeProductivityCardClass }}">
+          <p class="text-xs font-semibold uppercase tracking-wide {{ $employeeProductivityLabelClass }}">Current Productivity</p>
+          <p class="mt-1 text-2xl font-semibold {{ $employeeProductivityValueClass }}">{{ number_format((float) $employeeLatestProductivity, 1) }} /hr</p>
+          <p class="text-xs {{ $employeeProductivityLabelClass }}">
+            {{ $employeeProductivityGap >= 0 ? '+' : '' }}{{ number_format((float) $employeeProductivityGap, 1) }} vs target {{ number_format((float) $employeeTargetProductivity, 1) }}/hr
+          </p>
+          <p class="mt-1 text-xs {{ $employeeProductivityLabelClass }}">Best in window: {{ number_format((float) $employeePeakProductivity, 1) }}/hr</p>
         </div>
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Rank Trend</p>
-          <p class="mt-1 text-2xl font-semibold text-emerald-900">
+        <div class="rounded-xl border px-4 py-3 {{ $employeeQualityCardClass }}">
+          <p class="text-xs font-semibold uppercase tracking-wide {{ $employeeQualityLabelClass }}">Current Quality</p>
+          <p class="mt-1 text-2xl font-semibold {{ $employeeQualityValueClass }}">
             {{ number_format((float) $employeeLatestQuality, 1) }}%
           </p>
-          <p class="text-xs text-emerald-700">
-            Quality view. Best in window: {{ number_format((float) $employeeBestQuality, 1) }}%
+          <p class="text-xs {{ $employeeQualityLabelClass }}">
+            {{ $employeeQualityGap >= 0 ? '+' : '' }}{{ number_format((float) $employeeQualityGap, 1) }} vs target {{ number_format((float) $employeeTargetQuality, 1) }}%
           </p>
+          <p class="mt-1 text-xs {{ $employeeQualityLabelClass }}">Best in window: {{ number_format((float) $employeeBestQuality, 1) }}%</p>
         </div>
       </div>
           </div>
@@ -222,13 +277,13 @@
         @php
           $productivityBandClass = match ($managerOverview['productivity_status'] ?? 'amber') {
               'green' => 'border-emerald-200 bg-emerald-50 text-emerald-900',
-              'red' => 'border-rose-200 bg-rose-50 text-rose-900',
+              'red' => 'border-orange-200 bg-orange-50 text-orange-900',
               default => 'border-amber-200 bg-amber-50 text-amber-900',
           };
 
           $qualityBandClass = match ($managerOverview['quality_status'] ?? 'amber') {
               'green' => 'border-emerald-200 bg-emerald-50 text-emerald-900',
-              'red' => 'border-rose-200 bg-rose-50 text-rose-900',
+              'red' => 'border-orange-200 bg-orange-50 text-orange-900',
               default => 'border-amber-200 bg-amber-50 text-amber-900',
           };
         @endphp
@@ -279,7 +334,7 @@
           <div class="flex items-center justify-between px-1">
             <div>
               <h3 class="text-sm font-semibold text-slate-900">Department Operational Performance</h3>
-              <p class="text-[11px] text-slate-500">Click any point area to open Tasks for that time window.</p>
+              <p class="text-[11px] text-slate-500">Source: department roll-up of employee 15-minute samples. Click a point to open tickets for that window.</p>
             </div>
             <div class="inline-flex rounded-lg border border-slate-300 bg-white p-1 text-xs">
               @foreach (['7d' => 'Last 7 days', '24h' => 'Last 24 hours', '3h' => 'Last 3 hours'] as $scaleKey => $scaleLabel)
@@ -401,7 +456,7 @@
                   x-show="active"
                   x-cloak
                   class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow"
-                  :style="`left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);`"
+                  :style="active ? `left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);` : 'display: none;'"
                 >
                   <p class="font-semibold text-slate-900" x-text="active?.label"></p>
                   <p class="text-blue-700"><span x-text="active?.value"></span> <span x-text="active?.unit"></span></p>
@@ -481,7 +536,7 @@
                   x-show="active"
                   x-cloak
                   class="pointer-events-none absolute z-20 w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow"
-                  :style="`left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);`"
+                  :style="active ? `left: ${active.left}px; top: ${active.top}px; transform: translate(-50%, -100%);` : 'display: none;'"
                 >
                   <p class="font-semibold text-slate-900" x-text="active?.label"></p>
                   <p class="text-emerald-700"><span x-text="active?.value"></span><span x-text="active?.unit"></span></p>
@@ -522,11 +577,11 @@
                     'to_date' => $point['metric_date']?->toDateString(),
                 ], fn ($value) => $value !== null && $value !== '');
                 $breaches = (int) ($point['breached_tickets'] ?? 0);
-                $dayTone = $breaches > 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-white';
+                $dayTone = $breaches > 0 ? 'border-orange-200 bg-orange-50' : 'border-slate-200 bg-white';
               @endphp
               <a href="{{ route('tickets.index', $breachQuery) }}" class="rounded-lg border px-3 py-2 text-sm transition hover:border-blue-300 hover:bg-blue-50 {{ $dayTone }}">
                 <p class="text-xs text-slate-500">{{ $point['metric_date']?->format('M j') }}</p>
-                <p class="mt-1 font-semibold {{ $breaches > 0 ? 'text-rose-700' : 'text-slate-700' }}">
+                <p class="mt-1 font-semibold {{ $breaches > 0 ? 'text-orange-700' : 'text-slate-700' }}">
                   {{ $breaches }} breach{{ $breaches === 1 ? '' : 'es' }}
                 </p>
               </a>
@@ -546,7 +601,7 @@
                   ], fn ($value) => $value !== null && $value !== '');
                 @endphp
                 <div class="flex flex-1 flex-col items-center justify-end gap-1">
-                  <a href="{{ route('tickets.index', $breachQuery) }}" class="w-full rounded-t-md bg-rose-500 transition hover:bg-rose-600" style="height: {{ max(8, $height) }}%;" title="Open breached tickets for {{ $point['metric_date']?->format('M j') }}"></a>
+                  <a href="{{ route('tickets.index', $breachQuery) }}" class="w-full rounded-t-md bg-orange-500 transition hover:bg-orange-600" style="height: {{ max(8, $height) }}%;" title="Open breached tickets for {{ $point['metric_date']?->format('M j') }}"></a>
                   <span class="text-[10px] text-slate-500">{{ $point['metric_date']?->format('M j') }}</span>
                   <a href="{{ route('tickets.index', $breachQuery) }}" class="text-[10px] font-semibold text-slate-700 hover:text-blue-700 hover:underline">
                     {{ (int) ($point['breached_tickets'] ?? 0) }} breach{{ ((int) ($point['breached_tickets'] ?? 0)) === 1 ? '' : 'es' }}
@@ -555,7 +610,6 @@
               @endforeach
             </div>
           </div>
-        </div>
         @endif
       </div>
 
@@ -586,7 +640,7 @@
                   <a href="{{ route('tickets.index', $windowQuery) }}" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200">
                     View all
                   </a>
-                  <a href="{{ route('tickets.index', $breachedTypeQuery) }}" class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-200">
+                  <a href="{{ route('tickets.index', $breachedTypeQuery) }}" class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-200">
                     Breaches
                   </a>
                 </div>
@@ -621,7 +675,7 @@
           <div class="flex items-center justify-between gap-3">
             <h3 class="text-sm font-semibold text-slate-900">SLA Health</h3>
             <p class="text-xs text-slate-500">
-              Current open-ticket distribution (real-time snapshot) · {{ (int) ($managerSlaHealth['open_tickets'] ?? 0) }} open
+              Current open-ticket distribution · simulated live queue · {{ (int) ($managerSlaHealth['open_tickets'] ?? 0) }} open
             </p>
           </div>
           <div class="grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
@@ -638,7 +692,7 @@
               conic-gradient(
                 #10b981 0deg {{ $degWithin }}deg,
                 #f59e0b {{ $degWithin }}deg {{ $degWithin + $degAtRisk }}deg,
-                #ef4444 {{ $degWithin + $degAtRisk }}deg 360deg
+                #f97316 {{ $degWithin + $degAtRisk }}deg 360deg
               );"
               x-on:mouseenter="setSla($event, {label: 'SLA Mix', value: 'Within {{ number_format($within, 1) }}% | At Risk {{ number_format($atRisk, 1) }}% | Breached {{ number_format($breached, 1) }}%', hint: 'Current SLA distribution'})"
               x-on:mousemove="setSla($event, {label: 'SLA Mix', value: 'Within {{ number_format($within, 1) }}% | At Risk {{ number_format($atRisk, 1) }}% | Breached {{ number_format($breached, 1) }}%', hint: 'Current SLA distribution'})"
@@ -659,8 +713,8 @@
                 <span class="inline-flex items-center gap-2 text-slate-700"><span class="h-3 w-3 rounded-full bg-amber-500"></span>At Risk</span>
                 <span class="font-semibold text-slate-900">{{ (int) ($managerSlaHealth['at_risk_count'] ?? 0) }} · {{ number_format($atRisk, 1) }}%</span>
               </div>
-              <div class="flex items-center justify-between rounded-md px-2 py-1 hover:bg-red-50" x-on:mouseenter="setSla($event, {label: 'Breached', value: '{{ number_format($breached, 1) }}%', hint: 'Tickets currently outside SLA'})" x-on:mousemove="setSla($event, {label: 'Breached', value: '{{ number_format($breached, 1) }}%', hint: 'Tickets currently outside SLA'})">
-                <span class="inline-flex items-center gap-2 text-slate-700"><span class="h-3 w-3 rounded-full bg-red-500"></span>Breached</span>
+              <div class="flex items-center justify-between rounded-md px-2 py-1 hover:bg-orange-50" x-on:mouseenter="setSla($event, {label: 'Breached', value: '{{ number_format($breached, 1) }}%', hint: 'Tickets currently outside SLA'})" x-on:mousemove="setSla($event, {label: 'Breached', value: '{{ number_format($breached, 1) }}%', hint: 'Tickets currently outside SLA'})">
+                <span class="inline-flex items-center gap-2 text-slate-700"><span class="h-3 w-3 rounded-full bg-orange-500"></span>Breached</span>
                 <span class="font-semibold text-slate-900">{{ (int) ($managerSlaHealth['breached_count'] ?? 0) }} · {{ number_format($breached, 1) }}%</span>
               </div>
             </div>
@@ -669,7 +723,7 @@
             x-show="activeSla"
             x-cloak
             class="pointer-events-none absolute z-20 w-60 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm"
-            :style="`left: ${activeSla.left}px; top: ${activeSla.top}px; transform: translate(-50%, -100%);`"
+            :style="activeSla ? `left: ${activeSla.left}px; top: ${activeSla.top}px; transform: translate(-50%, -100%);` : 'display: none;'"
           >
             <p class="font-semibold text-slate-900" x-text="activeSla?.label"></p>
             <p class="text-slate-700" x-text="activeSla?.value"></p>

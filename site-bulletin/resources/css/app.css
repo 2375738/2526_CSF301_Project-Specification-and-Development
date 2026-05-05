@@ -4,15 +4,12 @@
 
 @layer utilities {
   .cwl1-bg {
-    background-color: #7ba764;
+    background-color: #f4f6f8;
     background-image:
-      radial-gradient(55rem 45rem at 75% 10%, rgba(246, 205, 77, 0.92), rgba(246, 205, 77, 0) 58%),
-      radial-gradient(44rem 36rem at 48% 66%, rgba(236, 158, 157, 0.75), rgba(236, 158, 157, 0) 62%),
-      radial-gradient(62rem 52rem at 14% 88%, rgba(125, 145, 115, 0.72), rgba(125, 145, 115, 0) 66%),
-      linear-gradient(120deg, #7ba764 0%, #92c971 36%, #e5b67a 72%, #ae855d 100%);
+      radial-gradient(58rem 34rem at 86% 0%, rgba(219, 234, 254, 0.52), rgba(219, 234, 254, 0) 58%),
+      linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
     background-attachment: fixed;
     background-size: cover;
-    animation: cwl1-bg-drift 28s ease-in-out infinite alternate;
   }
 
   .cwl1-noise {
@@ -24,7 +21,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    opacity: 0.06;
+    opacity: 0.025;
     background-image:
       radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.35) 1px, transparent 0);
     background-size: 4px 4px;
@@ -32,19 +29,7 @@
   }
 
   .cwl1-noise::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.26;
-    background-image:
-      radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.56) 0 1.7px, transparent 2.2px),
-      radial-gradient(circle at 74% 18%, rgba(191, 219, 254, 0.5) 0 1.7px, transparent 2.2px),
-      radial-gradient(circle at 82% 62%, rgba(255, 255, 255, 0.36) 0 1.45px, transparent 2px),
-      radial-gradient(circle at 28% 78%, rgba(191, 219, 254, 0.42) 0 1.45px, transparent 2px),
-      linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.08) 48%, transparent 100%);
-    background-size: 250px 250px, 310px 310px, 380px 380px, 330px 330px, 100% 100%;
-    animation: cwl1-atmosphere-drift 28s linear infinite;
+    content: none;
   }
 
   .chart-line-animate {
@@ -101,6 +86,29 @@
 
   .site-landing-hero .landing-dot-cluster-b {
     animation: landing-dots-float-b 11s ease-in-out infinite;
+  }
+
+  .messenger-inbox-collapse {
+    animation: messenger-inbox-collapse 0.28s ease-out;
+    transform-origin: left top;
+  }
+
+  .messenger-thread-enter {
+    animation: messenger-thread-enter 0.34s ease-out;
+    transform-origin: left center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chart-line-animate,
+    .chart-point-animate,
+    .dashboard-reveal,
+    .badge-pulse-soft,
+    .messenger-inbox-collapse,
+    .messenger-thread-enter {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
   }
 }
 
@@ -199,5 +207,27 @@
   50% {
     transform: translate3d(12px, -8px, 0);
     opacity: 0.8;
+  }
+}
+
+@keyframes messenger-inbox-collapse {
+  from {
+    opacity: 0.96;
+    transform: scaleX(1.02) translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1) translateX(0);
+  }
+}
+
+@keyframes messenger-thread-enter {
+  from {
+    opacity: 0;
+    transform: translateX(28px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
   }
 }

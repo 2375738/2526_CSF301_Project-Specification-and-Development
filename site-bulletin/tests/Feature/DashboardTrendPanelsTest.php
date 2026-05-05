@@ -8,18 +8,20 @@ use App\Models\Conversation;
 use App\Models\ManagerRelationship;
 use App\Models\Category;
 use App\Models\Message;
+use App\Models\PerformanceSample;
 use App\Models\RoleChangeRequest;
 use App\Models\Ticket;
 use App\Models\PerformanceSnapshot;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class DashboardTrendPanelsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_employee_sees_employee_trend_panel(): void
+    public function test_employee_sees_employee_trend_panel_on_my_work_page(): void
     {
         $employee = User::factory()->create(['role' => 'employee']);
 
@@ -35,8 +37,9 @@ class DashboardTrendPanelsTest extends TestCase
             ]);
 
         $this->actingAs($employee)
-            ->get(route('home'))
+            ->get(route('my-work.index'))
             ->assertOk()
+            ->assertSeeText('My Work')
             ->assertSeeText('Employee Performance Trend')
             ->assertSeeText('Quality vs Productivity Trend');
     }
@@ -111,7 +114,18 @@ class DashboardTrendPanelsTest extends TestCase
             ->assertSeeText('Shift Targets')
             ->assertSeeText('Attention Needed')
             ->assertSeeText('Action needed from you')
-            ->assertSeeText('Scanner battery swap needed');
+            ->assertSeeText('Scanner battery swap needed')
+            ->assertSee(route('my-work.index'), false)
+            ->assertDontSeeText('Employee Performance Trend');
+    }
+
+    public function test_manager_is_redirected_away_from_my_work_page(): void
+    {
+        $manager = User::factory()->manager()->create();
+
+        $this->actingAs($manager)
+            ->get(route('my-work.index'))
+            ->assertRedirect(route('home'));
     }
 
     public function test_manager_sees_department_trend_panel(): void
@@ -273,5 +287,69 @@ class DashboardTrendPanelsTest extends TestCase
             ->assertSeeText('Attention Queue')
             ->assertSeeText('Managed department queue item')
             ->assertSeeText('Department Trend Overview');
+    }
+
+    public function test_manager_performance_summary_uses_employee_samples_as_source_of_truth(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-16 12:00:00'));
+
+        try {
+            $department = Department::factory()->create([
+                'name' => 'Inbound',
+                'ops_code' => 'INB',
+                'target_units_per_hour' => 40,
+                'target_quality_pct' => 95,
+                'day_shift_start' => '10:00:00',
+                'day_shift_end' => '20:00:00',
+            ]);
+            $manager = User::factory()->manager()->create([
+                'primary_department_id' => $department->id,
+            ]);
+            $employee = User::factory()->create([
+                'role' => 'employee',
+                'primary_department_id' => $department->id,
+            ]);
+
+            $manager->departments()->attach($department->id, ['role' => 'manager', 'is_primary' => true]);
+            $employee->departments()->attach($department->id, ['role' => 'member', 'is_primary' => true]);
+
+            DepartmentMetric::factory()->create([
+                'department_id' => $department->id,
+                'metric_date' => now()->toDateString(),
+                'open_tickets' => 0,
+                'sla_breaches' => 0,
+            ]);
+
+            foreach (['11:00:00', '11:15:00', '11:30:00', '11:45:00', '12:00:00'] as $time) {
+                PerformanceSample::create([
+                    'user_id' => $employee->id,
+                    'recorded_at' => '2026-03-16 ' . $time,
+                    'units_per_hour' => 40,
+                    'quality_score' => 95,
+                ]);
+
+                PerformanceSample::create([
+                    'user_id' => $manager->id,
+                    'recorded_at' => '2026-03-16 ' . $time,
+                    'units_per_hour' => 200,
+                    'quality_score' => 70,
+                ]);
+            }
+
+            $this->actingAs($manager)
+                ->get(route('home'))
+                ->assertOk()
+                ->assertSeeText('Team Size')
+                ->assertSeeText('Active now /')
+                ->assertSeeText('Avg Productivity')
+                ->assertSeeText('40.0 /hr')
+                ->assertSeeText('Quality Score')
+                ->assertSeeText('95.0%')
+                ->assertSeeText('Units Processed')
+                ->assertSeeText('50')
+                ->assertDontSeeText('200.0 /hr');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

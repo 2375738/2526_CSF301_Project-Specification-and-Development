@@ -27,8 +27,8 @@ class AnalyticsController extends Controller
             ->whereIn('status', array_map(fn ($status) => $status->value, TicketStatus::open()))
             ->groupBy('priority')
             ->get()
-            ->sortBy(fn ($row) => array_search($row->priority, ['critical', 'high', 'medium', 'low']))
-            ->pluck('total', 'priority');
+            ->sortBy(fn ($row) => array_search($row->priority?->value ?? $row->priority, ['critical', 'high', 'medium', 'low']))
+            ->mapWithKeys(fn ($row) => [$row->priority?->value ?? $row->priority => $row->total]);
 
         $since = Carbon::now()->subDays(30);
         $recentTickets = Ticket::with(['category', 'assignee'])

@@ -26,8 +26,9 @@ class NewAnnouncement extends Notification implements ShouldQueue
         return [
             'title' => 'New Announcement: ' . $this->announcement->title,
             'message' => \Illuminate\Support\Str::limit($this->announcement->body, 50),
-            'url' => route('dashboard'), // Or a specific announcement route if one exists
+            'url' => route('announcements.show', $this->announcement),
             'type' => 'announcement',
+            'action_label' => 'Read announcement',
             'author_id' => $this->announcement->author_id,
         ];
     }

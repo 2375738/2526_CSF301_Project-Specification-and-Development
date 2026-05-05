@@ -1,179 +1,110 @@
 @extends('layouts.app')
 
-@extends('layouts.app')
-
-@extends('layouts.app')
-
 @section('content')
-<div x-data="{ activeTab: 'job' }" class="space-y-6">
-    
-    <!-- Profile Header -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 flex items-start justify-between shadow-sm">
-        <div class="flex items-start gap-6">
-            <!-- Icon Avatar -->
-            <div class="h-20 w-20 bg-orange-100 rounded-md flex items-center justify-center text-orange-500 border border-orange-200">
-                <svg class="h-12 w-12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
+@php
+    $initials = collect(explode(' ', trim($user->name)))
+        ->filter()
+        ->take(2)
+        ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
+        ->implode('');
+
+    $roleLabel = $user->role?->label()
+        ?? ($user->role ? str($user->role)->replace('_', ' ')->title()->toString() : 'Employee');
+@endphp
+
+<div class="space-y-6">
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div class="flex min-w-0 items-start gap-4">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-semibold text-white">
+                    {{ $initials }}
+                </div>
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h1 class="truncate text-2xl font-semibold text-slate-900">{{ $user->name }}</h1>
+                        @if($user->pronouns)
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{{ $user->pronouns }}</span>
+                        @endif
+                    </div>
+                    <p class="mt-1 text-sm font-medium text-slate-700">{{ $user->job_title ?? 'Associate' }}</p>
+                    <p class="text-sm text-slate-500">{{ $roleLabel }} · {{ $user->primaryDepartment->name ?? 'No department assigned' }}</p>
+                </div>
             </div>
-            
-            <div>
-                <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    {{ $user->name }} 
-                    @if($user->pronouns)
-                        <span class="text-slate-500 font-normal text-base">({{ $user->pronouns }})</span>
-                    @endif
-                </h1>
-                <div class="text-sm text-slate-600 mt-2 space-y-1">
-                    <p class="font-medium">{{ $user->job_title ?? 'Associate' }}</p>
-                    <p>{{ $user->location ?? 'Site' }}</p>
-                    <a href="#" class="text-blue-600 hover:underline text-xs font-medium">View Phone Tool</a>
+
+            <div class="grid gap-2 text-sm text-slate-600 sm:grid-cols-2 md:min-w-80">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Employee ID</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ $user->employee_id ?? '-' }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Site</p>
+                    <p class="mt-1 font-medium text-slate-900">{{ $user->location ?? '-' }}</p>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Tabs -->
-    <div class="border-b border-slate-200">
-        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-            <button @click="activeTab = 'job'" 
-                    :class="{ 'border-blue-600 text-slate-900': activeTab === 'job', 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300': activeTab !== 'job' }"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors duration-150">
-                Job details and history
-            </button>
-            <button @click="activeTab = 'personal'" 
-                    :class="{ 'border-blue-600 text-slate-900': activeTab === 'personal', 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300': activeTab !== 'personal' }"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors duration-150">
-                Manage personal information
-            </button>
-        </nav>
-    </div>
-
-    <!-- Job Details Tab -->
-    <div x-show="activeTab === 'job'" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Left Column: Job Details & History -->
-        <div class="lg:col-span-2 space-y-8">
-            <!-- Job Details -->
-            <div class="bg-white shadow-sm rounded-lg border border-slate-200 p-6">
-                <h2 class="text-lg font-bold text-slate-900 mb-4">Job details</h2>
-                <div class="space-y-4">
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
+        <aside class="space-y-6">
+            <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 class="text-base font-semibold text-slate-900">Work Profile</h2>
+                <dl class="mt-4 space-y-4 text-sm">
                     <div>
-                        <p class="text-slate-500 text-sm">Login</p>
-                        <p class="font-medium text-slate-900">{{ $user->email }}</p>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Login</dt>
+                        <dd class="mt-1 break-all font-medium text-slate-900">{{ $user->email }}</dd>
                     </div>
                     <div>
-                        <p class="text-slate-500 text-sm">Employee ID</p>
-                        <p class="font-medium text-slate-900">{{ $user->employee_id ?? '-' }}</p>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Department</dt>
+                        <dd class="mt-1 font-medium text-slate-900">{{ $user->primaryDepartment->name ?? 'Not assigned' }}</dd>
                     </div>
                     <div>
-                        <p class="text-slate-500 text-sm">Job Title</p>
-                        <p class="font-medium text-slate-900">{{ $user->job_title ?? '-' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-slate-500 text-sm">Department</p>
-                        <p class="font-medium text-slate-900">{{ $user->primaryDepartment->name ?? 'Not Assigned' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-slate-500 text-sm">Manager</p>
-                        <div class="flex items-center gap-2 mt-1">
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Manager</dt>
+                        <dd class="mt-1">
                             @if($manager)
-                                <a href="#" class="text-blue-600 hover:underline font-medium">{{ $manager->name }}</a>
-                                <span class="text-slate-400 text-xs">({{ $manager->email }})</span>
+                                <span class="font-medium text-slate-900">{{ $manager->name }}</span>
+                                <span class="block break-all text-xs text-slate-500">{{ $manager->email }}</span>
                             @else
-                                <p class="text-slate-400 italic">No manager assigned</p>
+                                <span class="text-slate-500">No manager assigned</span>
                             @endif
-                        </div>
+                        </dd>
                     </div>
                     <div>
-                        <p class="text-slate-500 text-sm">Site / Location</p>
-                        <p class="font-medium text-slate-900">{{ $user->location ?? '-' }}</p>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone</dt>
+                        <dd class="mt-1 font-medium text-slate-900">{{ $user->phone ?? '-' }}</dd>
                     </div>
-                </div>
-                <div class="mt-4 pt-4 border-t border-slate-100">
-                    <button class="text-blue-600 text-sm hover:underline font-medium flex items-center gap-1">
-                        Show more 
-                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+                </dl>
+            </section>
 
-            <!-- Job History -->
-            <div class="bg-white shadow-sm rounded-lg border border-slate-200 p-6">
-                <h2 class="text-lg font-bold text-slate-900 mb-6">Job history</h2>
-                <div class="relative border-l-2 border-slate-200 ml-3 space-y-10 pb-2">
-                    @foreach($jobHistory as $job)
-                        <div class="relative pl-8">
-                            <!-- Dot -->
-                            <div class="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white {{ $job['status'] === 'current' ? 'bg-blue-600' : 'bg-slate-300' }}"></div>
-                            
-                            <!-- Content -->
-                            <div>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 mb-2">
-                                    Manager change
-                                </span>
-                                <p class="text-xs text-slate-500 mb-1 font-medium">{{ $job['start_date'] }} <span class="font-normal text-slate-400">({{ $job['duration'] }})</span></p>
-                                <h3 class="text-sm font-bold text-slate-900">{{ $job['role'] }}</h3>
-                                <p class="text-sm text-slate-600 mt-1">Department: {{ $job['department'] }}</p>
-                                <p class="text-sm text-slate-600">
-                                    Manager: <a href="mailto:{{ $job['manager_email'] }}" class="text-blue-600 hover:underline">{{ $job['manager'] }}</a>
-                                </p>
+            @if(! empty($jobHistory))
+                <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 class="text-base font-semibold text-slate-900">Recent Role History</h2>
+                    <div class="mt-4 space-y-4">
+                        @foreach(collect($jobHistory)->take(3) as $job)
+                            <div class="border-l-2 {{ $job['status'] === 'current' ? 'border-blue-600' : 'border-slate-200' }} pl-3 text-sm">
+                                <p class="font-semibold text-slate-900">{{ $job['role'] }}</p>
+                                <p class="text-xs text-slate-500">{{ $job['department'] }} · {{ $job['start_date'] }} · {{ $job['duration'] }}</p>
+                                <p class="text-xs text-slate-500">Manager: {{ $job['manager'] }}</p>
                             </div>
-                        </div>
-                    @endforeach
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+        </aside>
+
+        <section class="space-y-6">
+            <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" id="personal">
+                @include('profile.partials.update-profile-information-form')
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-2">
+                <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    @include('profile.partials.update-password-form')
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    @include('profile.partials.delete-user-form')
                 </div>
             </div>
-        </div>
-
-        <!-- Right Column: Resources -->
-        <div class="space-y-6">
-            <div class="bg-white shadow-sm rounded-lg border border-slate-200 p-6">
-                <h2 class="text-lg font-bold text-slate-900 mb-4">Resources</h2>
-                <ul class="space-y-4 text-sm">
-                    <li><a href="#" class="text-blue-600 hover:underline flex justify-between items-center group">
-                        <span>Events timeline</span>
-                        <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a></li>
-                    <li><a href="#" class="text-blue-600 hover:underline flex justify-between items-center group">
-                        <span>Benefits</span>
-                        <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a></li>
-                    <li><a href="#" class="text-blue-600 hover:underline flex justify-between items-center group">
-                        <span>Personal bank accounts</span>
-                        <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a></li>
-                    <li><a href="#" class="text-blue-600 hover:underline flex justify-between items-center group">
-                        <span>Payroll information</span>
-                        <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a></li>
-                    <li><a href="#" class="text-blue-600 hover:underline flex justify-between items-center group">
-                        <span>Compensation statements</span>
-                        <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a></li>
-                    <li><a href="#" class="text-blue-600 hover:underline flex justify-between items-center group">
-                        <span>Employee discount</span>
-                        <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a></li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Personal Info Tab -->
-    <div x-show="activeTab === 'personal'" class="grid gap-6 lg:grid-cols-2" style="display: none;">
-        <div class="p-6 bg-white shadow-sm rounded-lg border border-slate-200">
-            @include('profile.partials.update-profile-information-form')
-        </div>
-
-        <div class="space-y-6">
-            <div class="p-6 bg-white shadow-sm rounded-lg border border-slate-200">
-                @include('profile.partials.update-password-form')
-            </div>
-            <div class="p-6 bg-white shadow-sm rounded-lg border border-slate-200">
-                @include('profile.partials.delete-user-form')
-            </div>
-        </div>
+        </section>
     </div>
 </div>
 @endsection

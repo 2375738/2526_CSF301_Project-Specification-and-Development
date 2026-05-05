@@ -125,7 +125,7 @@
                 <path d="M9.25 3a.75.75 0 00-1.5 0v2.5H5.25a.75.75 0 000 1.5H7.75V9.5a.75.75 0 001.5 0V7h2.5a.75.75 0 000-1.5H9.25z" />
                 <path d="M16.5 5A1.5 1.5 0 0118 6.5v9A1.5 1.5 0 0116.5 17h-13A1.5 1.5 0 012 15.5v-9A1.5 1.5 0 013.5 5h13z" />
               </svg>
-              View Tasks
+              View Tickets
             </a>
             <a href="{{ route('messages.index') }}" class="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/25 hover:bg-white hover:text-slate-900">
               <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -144,6 +144,7 @@
   ])
 
   @auth
+    @if (! $isEmployeeDashboard)
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Announcements</p>
@@ -166,6 +167,7 @@
         <p class="text-sm text-slate-500">Recently tracked data points</p>
       </div>
     </section>
+    @endif
   @endauth
 
   @include('dashboard.partials.manager-attention-queue', [
@@ -191,77 +193,6 @@
       'unreadAnnouncementCount' => $unreadAnnouncementCount ?? 0,
       'highPriorityAnnouncementCount' => $highPriorityAnnouncementCount ?? 0,
   ])
-
-  <section class="space-y-5">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-slate-900">Announcements</h2>
-      <a href="{{ route('announcements.index') }}" class="text-xs font-semibold uppercase tracking-wider text-blue-600 hover:underline">View all</a>
-    </div>
-    @if ($announcements->isEmpty())
-      <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
-        Nothing to share yet. Check back soon for site updates.
-      </div>
-    @else
-      <div class="grid gap-4 lg:grid-cols-2">
-        @foreach ($announcements as $announcement)
-          <article class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                  News Update
-                </span>
-                @if ($announcement->is_pinned)
-                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-medium text-amber-700">
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path d="M7.5 2.75A.75.75 0 018.25 2h3.5a.75.75 0 01.75.75v4.257l2.459 1.64a.75.75 0 01-.12 1.32l-2.339.936V15l1.3 1.3a.75.75 0 11-1.06 1.06L10 15.43l-2.44 1.93a.75.75 0 11-1.06-1.06L7.8 15v-4.097l-2.34-.936a.75.75 0 01-.12-1.32L7.5 7.007V2.75z" />
-                    </svg>
-                    Pinned
-                  </span>
-                @endif
-                @if ($announcement->department)
-                  <span class="inline-flex items-center rounded-full bg-slate-900/10 px-3 py-0.5 text-xs font-medium text-slate-700">
-                    {{ $announcement->department->name }}
-                  </span>
-                @endif
-                @if ($announcement->audience === 'managers')
-                  <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-0.5 text-xs font-medium text-blue-700">
-                    Managers Only
-                  </span>
-                @endif
-              </div>
-              <div class="space-y-2">
-                <h3 class="text-lg font-semibold leading-tight text-slate-900">
-                  <a href="{{ route('announcements.show', $announcement) }}" class="hover:text-blue-700 hover:underline">
-                    {{ $announcement->title }}
-                  </a>
-                </h3>
-                <p class="text-sm leading-6 text-slate-600">{{ \Illuminate\Support\Str::limit($announcement->body, 180) }}</p>
-              </div>
-              @if ($announcement->starts_at || $announcement->ends_at)
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  @if ($announcement->starts_at)
-                    {{ $announcement->starts_at->format('M j, H:i') }}
-                  @endif
-                  —
-                  @if ($announcement->ends_at)
-                    {{ $announcement->ends_at->format('M j, H:i') }}
-                  @else
-                    Ongoing
-                  @endif
-                </p>
-              @endif
-              <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                <span>{{ $announcement->author->name ?? 'System' }} · Updated {{ $announcement->updated_at?->diffForHumans() ?? 'recently' }}</span>
-                <a href="{{ route('announcements.show', $announcement) }}" class="font-semibold text-blue-600 group-hover:text-blue-700">
-                  Read update
-                </a>
-              </div>
-            </div>
-          </article>
-        @endforeach
-      </div>
-    @endif
-  </section>
 
   <section class="space-y-5">
     <div class="flex items-center justify-between">
@@ -338,54 +269,4 @@
       </div>
     @endif
   </section>
-
-  @auth
-    @if (auth()->user()->isEmployee())
-      <section class="space-y-5">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-slate-900">Performance (Last 6 Weeks)</h2>
-          @if ($riskFlag)
-            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-              <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 0 0116 0zm-7.25-4.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5zm.25 8.5a1 1 0 10-2 0 1 1 0 002 0z" clip-rule="evenodd" />
-              </svg>
-              ADAPT Risk
-            </span>
-          @endif
-        </div>
-        @if ($snapshots->isEmpty())
-          <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-slate-500">
-            No performance data yet.
-          </div>
-        @else
-          <div class="grid gap-5 md:grid-cols-3">
-            @foreach ($snapshots as $snapshot)
-              <div class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div>
-                  <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Week of {{ $snapshot->week_start->format('M j') }}</p>
-                  <p class="mt-2 text-2xl font-semibold text-slate-900">
-                    {{ $snapshot->units_per_hour ?? '—' }}
-                    <span class="text-xs font-normal text-slate-500">units/hr</span>
-                  </p>
-                </div>
-                <div class="flex items-center justify-between text-sm text-slate-600">
-                  <span>Percentile</span>
-                  <span class="font-semibold">{{ $snapshot->rank_percentile ?? '—' }}</span>
-                </div>
-                <div class="overflow-hidden rounded-full bg-slate-100">
-                  @php
-                      $percent = is_numeric($snapshot->rank_percentile ?? null) ? max(0, min(100, $snapshot->rank_percentile)) : null;
-                  @endphp
-                  <div class="h-2 bg-slate-900 transition-all duration-500" style="width: {{ $percent !== null ? $percent . '%' : '0%' }}"></div>
-                </div>
-              </div>
-            @endforeach
-          </div>
-        @endif
-        <p class="text-xs text-slate-500">
-          Placeholder metrics for coursework. Not reflective of live ADAPT performance.
-        </p>
-      </section>
-    @endif
-  @endauth
 </div>

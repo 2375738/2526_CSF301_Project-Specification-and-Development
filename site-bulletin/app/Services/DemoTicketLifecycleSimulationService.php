@@ -124,7 +124,7 @@ class DemoTicketLifecycleSimulationService
             $createdAt = $latestAllowed->copy();
         }
 
-        $firstResponseBreached = $this->seededRatio($simulationKey . ':first-response-breached') > 0.74;
+        $firstResponseBreached = $this->seededRatio($simulationKey . ':first-response-breached') > 0.92;
         $firstResponseMinutes = $firstResponseBreached
             ? $this->seededInt($simulationKey . ':first-response', $targets['first_response_minutes'] + 10, max($targets['first_response_minutes'] + 30, $targets['first_response_minutes'] * 2))
             : $this->seededInt($simulationKey . ':first-response', 6, max(8, (int) floor($targets['first_response_minutes'] * 0.85)));
@@ -135,6 +135,36 @@ class DemoTicketLifecycleSimulationService
         }
 
         $finalStatus = $this->determineFinalStatus($simulationKey);
+        $isOpenStatus = in_array($finalStatus, [TicketStatus::Triaged->value, TicketStatus::InProgress->value, TicketStatus::WaitingEmployee->value, TicketStatus::Reopened->value], true);
+        $openAgeMinutes = null;
+
+        if ($isOpenStatus) {
+            $ageRatio = $this->seededRatio($simulationKey . ':open-age-band');
+            [$minAge, $maxAge] = match (true) {
+                $ageRatio < 0.65 => [
+                    max($firstResponseMinutes + 20, 30),
+                    max($firstResponseMinutes + 30, (int) floor($targets['resolution_minutes'] * 0.55)),
+                ],
+                $ageRatio < 0.9 => [
+                    max($firstResponseMinutes + 45, (int) floor($targets['resolution_minutes'] * 0.56)),
+                    max($firstResponseMinutes + 60, (int) floor($targets['resolution_minutes'] * 0.92)),
+                ],
+                default => [
+                    max($firstResponseMinutes + 60, (int) floor($targets['resolution_minutes'] * 1.05)),
+                    max($firstResponseMinutes + 90, (int) floor($targets['resolution_minutes'] * 1.30)),
+                ],
+            };
+            $openAgeMinutes = $this->seededInt($simulationKey . ':open-age', $minAge, $maxAge);
+
+            // Open work should look current. Historical buckets can still seed volume,
+            // but unresolved tickets must be aged relative to now for SLA realism.
+            $createdAt = $latestAllowed->copy()->subMinutes($openAgeMinutes);
+            $triagedAt = $createdAt->copy()->addMinutes($firstResponseMinutes);
+            if ($triagedAt->greaterThan($latestAllowed)) {
+                $triagedAt = $createdAt->copy()->addMinutes(min(15, max(1, $openAgeMinutes - 1)));
+            }
+        }
+
         $timeline = [
             ['from' => null, 'to' => TicketStatus::New->value, 'at' => $createdAt->copy()->addMinute(), 'reason' => 'Ticket opened by requester'],
             ['from' => TicketStatus::New->value, 'to' => TicketStatus::Triaged->value, 'at' => $triagedAt->copy(), 'reason' => 'Acknowledged by manager'],
@@ -143,12 +173,7 @@ class DemoTicketLifecycleSimulationService
         $updatedAt = $triagedAt->copy();
         $closedAt = null;
 
-        if (in_array($finalStatus, [TicketStatus::Triaged->value, TicketStatus::InProgress->value, TicketStatus::WaitingEmployee->value, TicketStatus::Reopened->value], true)) {
-            $openAgeMinutes = $this->seededInt(
-                $simulationKey . ':open-age',
-                max($firstResponseMinutes + 45, 90),
-                max($targets['resolution_minutes'] + 180, 360)
-            );
+        if ($isOpenStatus) {
             $updatedAt = $createdAt->copy()->addMinutes($openAgeMinutes);
             if ($updatedAt->greaterThan($latestAllowed)) {
                 $updatedAt = $latestAllowed->copy();
@@ -181,7 +206,7 @@ class DemoTicketLifecycleSimulationService
                 ];
             }
         } else {
-            $resolutionBreached = $this->seededRatio($simulationKey . ':resolution-breached') > 0.78;
+            $resolutionBreached = $this->seededRatio($simulationKey . ':resolution-breached') > 0.9;
             $resolutionMinutes = $resolutionBreached
                 ? $this->seededInt($simulationKey . ':resolution', $targets['resolution_minutes'] + 30, max($targets['resolution_minutes'] + 120, $targets['resolution_minutes'] * 2))
                 : $this->seededInt($simulationKey . ':resolution', max(45, (int) floor($targets['resolution_minutes'] * 0.45)), max(60, (int) floor($targets['resolution_minutes'] * 0.92)));
@@ -331,11 +356,11 @@ class DemoTicketLifecycleSimulationService
         $ratio = $this->seededRatio($simulationKey . ':final-status');
 
         return match (true) {
-            $ratio < 0.18 => TicketStatus::Triaged->value,
-            $ratio < 0.46 => TicketStatus::InProgress->value,
-            $ratio < 0.64 => TicketStatus::WaitingEmployee->value,
-            $ratio < 0.74 => TicketStatus::Reopened->value,
-            $ratio < 0.9 => TicketStatus::Resolved->value,
+            $ratio < 0.12 => TicketStatus::Triaged->value,
+            $ratio < 0.32 => TicketStatus::InProgress->value,
+            $ratio < 0.44 => TicketStatus::WaitingEmployee->value,
+            $ratio < 0.50 => TicketStatus::Reopened->value,
+            $ratio < 0.84 => TicketStatus::Resolved->value,
             default => TicketStatus::Closed->value,
         };
     }
@@ -345,9 +370,9 @@ class DemoTicketLifecycleSimulationService
         $ratio = $this->seededRatio($simulationKey . ':priority');
 
         return match (true) {
-            $ratio < 0.18 => 'critical',
-            $ratio < 0.45 => 'high',
-            $ratio < 0.8 => 'medium',
+            $ratio < 0.06 => 'critical',
+            $ratio < 0.24 => 'high',
+            $ratio < 0.78 => 'medium',
             default => 'low',
         };
     }

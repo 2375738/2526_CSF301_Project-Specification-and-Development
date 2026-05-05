@@ -42,6 +42,10 @@ class TicketViewController extends Controller
             $query->where('category_id', $request->integer('category_id'));
         }
 
+        if ($request->boolean('unassigned')) {
+            $query->whereNull('assignee_id');
+        }
+
         if ($request->boolean('overdue') || $request->boolean('breached')) {
             $query->where(function ($q) {
                 $q->where('sla_first_response_breached', true)
@@ -108,7 +112,7 @@ class TicketViewController extends Controller
 
         return view('tickets.index', [
             'tickets' => $tickets,
-            'filters' => $request->only(['status', 'search', 'mine', 'department_id', 'overdue', 'breached', 'from_date', 'to_date', 'category_id']),
+            'filters' => $request->only(['status', 'search', 'mine', 'department_id', 'overdue', 'breached', 'from_date', 'to_date', 'category_id', 'unassigned']),
             'departmentFilterOptions' => $departmentFilterOptions,
             'categoryFilterOptions' => $categoryFilterOptions,
             'approvalQueue' => $approvalQueue,
@@ -150,14 +154,6 @@ class TicketViewController extends Controller
                 ->get();
         }
 
-        $lifecycle = $this->buildLifecycleSummary($ticket, $comments, $sla);
-        $timelineEntries = $ticket->statusChanges->map(function (TicketStatusChange $change): array {
-            return [
-                'change' => $change,
-                'headline' => $this->statusTimelineHeadline($change),
-                'detail' => $this->statusTimelineDetail($change),
-            ];
-        });
         $templateMeta = $ticket->template_key
             ? collect(config('ticket_templates', []))->get($ticket->template_key)
             : null;
@@ -179,6 +175,8 @@ class TicketViewController extends Controller
         $visibleAttachments = $ticket->attachments
             ->filter(fn ($attachment) => $attachment->visibleTo($request->user()))
             ->values();
+        $lifecycle = $this->buildLifecycleSummary($ticket, $comments, $sla);
+        $timelineEntries = $this->buildTicketTimeline($ticket, $comments, $visibleAttachments);
 
         return view('tickets.show', [
             'ticket' => $ticket,
@@ -457,6 +455,79 @@ class TicketViewController extends Controller
             TicketStatus::Closed => 'The issue was confirmed complete and no more work is planned.',
             TicketStatus::Reopened => 'The issue came back or the fix did not hold, so work resumed.',
             TicketStatus::Cancelled => 'The ticket was cancelled or merged into another report.',
+        };
+    }
+
+    /**
+     * @param  Collection<int, TicketComment>  $comments
+     * @param  Collection<int, \App\Models\TicketAttachment>  $attachments
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function buildTicketTimeline(Ticket $ticket, Collection $comments, Collection $attachments): Collection
+    {
+        $entries = collect([
+            [
+                'type' => 'Opened',
+                'headline' => 'Ticket opened',
+                'detail' => 'The request was logged and added to the support queue.',
+                'actor' => $ticket->requester?->name,
+                'created_at' => $ticket->created_at,
+                'tone' => 'blue',
+            ],
+        ]);
+
+        $ticket->statusChanges->each(function (TicketStatusChange $change) use ($entries): void {
+            $entries->push([
+                'type' => 'Status',
+                'headline' => $this->statusTimelineHeadline($change),
+                'detail' => $this->statusTimelineDetail($change),
+                'note' => $change->reason,
+                'actor' => $change->user?->name,
+                'created_at' => $change->created_at,
+                'tone' => $this->statusTimelineTone($change),
+            ]);
+        });
+
+        $comments->each(function (TicketComment $comment) use ($entries): void {
+            $entries->push([
+                'type' => $comment->is_private ? 'Private note' : 'Update',
+                'headline' => $comment->is_private ? 'Internal note added' : 'Update posted',
+                'detail' => $comment->body,
+                'actor' => $comment->author?->name,
+                'created_at' => $comment->created_at,
+                'tone' => $comment->is_private ? 'amber' : 'slate',
+            ]);
+        });
+
+        $attachments->each(function ($attachment) use ($entries): void {
+            $entries->push([
+                'type' => 'Evidence',
+                'headline' => 'Attachment added',
+                'detail' => $attachment->label ?: $attachment->original_name,
+                'note' => $attachment->kindLabel(),
+                'actor' => $attachment->uploader?->name,
+                'created_at' => $attachment->created_at,
+                'tone' => 'slate',
+            ]);
+        });
+
+        return $entries
+            ->filter(fn (array $entry) => $entry['created_at'])
+            ->sortBy('created_at')
+            ->values();
+    }
+
+    protected function statusTimelineTone(TicketStatusChange $change): string
+    {
+        $toStatus = $change->to_status instanceof TicketStatus
+            ? $change->to_status
+            : TicketStatus::from((string) $change->to_status);
+
+        return match ($toStatus) {
+            TicketStatus::WaitingEmployee, TicketStatus::Reopened => 'amber',
+            TicketStatus::Resolved, TicketStatus::Closed => 'green',
+            TicketStatus::Cancelled => 'slate',
+            default => 'blue',
         };
     }
 }

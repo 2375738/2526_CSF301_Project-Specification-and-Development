@@ -17,19 +17,21 @@ class LayoutNavigationTest extends TestCase
         $this->actingAs($employee)
             ->get(route('home'))
             ->assertOk()
-            ->assertSee('Announcements')
+            ->assertSee('My Work')
             ->assertSee('Messages')
-            ->assertSee('Tasks')
+            ->assertSee('Tickets')
+            ->assertDontSee('Announcements')
             ->assertDontSee('Governance');
     }
 
-    public function test_manager_sees_governance_link(): void
+    public function test_manager_sees_governance_and_analytics_links(): void
     {
         $manager = User::factory()->manager()->create();
 
         $this->actingAs($manager)
             ->get(route('home'))
             ->assertOk()
+            ->assertSee('Analytics')
             ->assertSee('Governance');
     }
 

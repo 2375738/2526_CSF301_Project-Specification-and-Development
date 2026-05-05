@@ -5,7 +5,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-semibold text-slate-900">Analytics &amp; Reporting</h1>
-        <p class="text-sm text-slate-600">Operational snapshot for the last 30 days. Export data for further analysis.</p>
+        <p class="text-sm text-slate-600">Ticket and SLA decision view for the selected department. Updated {{ now()->format('H:i') }} from the simulated live queue.</p>
       </div>
       <a href="{{ route('analytics.export') }}" class="inline-flex items-center rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-900">Download CSV</a>
     </div>
@@ -66,6 +66,35 @@
       <button type="submit" class="inline-flex items-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Save view</button>
     </form>
 
+    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">Decision Queue</h2>
+          <p class="text-sm text-slate-500">Use this first to decide whether to rebalance team attention.</p>
+        </div>
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+          {{ $selectedDepartment ? ($departmentOptions[$selectedDepartment] ?? 'Selected department') : 'All departments' }} · {{ $trendDays }} days
+        </span>
+      </div>
+      <div class="mt-4 grid gap-3 md:grid-cols-3">
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Breach Pressure</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ $breachesLastWeek }}</p>
+          <p class="text-xs text-amber-800">SLA breaches in the last 7 days</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Response Load</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ $firstResponseAvg ? number_format($firstResponseAvg, 1) . ' mins' : 'n/a' }}</p>
+          <p class="text-xs text-slate-500">Average first response time</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Resolution Drag</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ $resolutionAvg ? number_format($resolutionAvg, 1) . ' mins' : 'n/a' }}</p>
+          <p class="text-xs text-slate-500">Average time to close tickets</p>
+        </div>
+      </div>
+    </section>
+
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       @php $priorities = ['critical' => 'Critical', 'high' => 'High', 'medium' => 'Medium', 'low' => 'Low']; @endphp
       @foreach ($priorities as $key => $label)
@@ -90,7 +119,8 @@
 
     <div class="grid gap-6 lg:grid-cols-2">
       <section class="rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-slate-900">Top Categories</h2>
+        <h2 class="text-lg font-semibold text-slate-900">Recurring Blockers</h2>
+        <p class="text-xs text-slate-500">Highest ticket volume categories in the selected window.</p>
         <table class="mt-4 w-full text-sm">
           <thead class="text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -110,7 +140,8 @@
       </section>
 
       <section class="rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-slate-900">Recent Activity</h2>
+        <h2 class="text-lg font-semibold text-slate-900">Recent Ticket Movement</h2>
+        <p class="text-xs text-slate-500">Latest changed tickets, with owner and category context.</p>
         <ul class="mt-4 space-y-3 text-sm">
           @foreach ($recentActivity as $ticket)
             <li class="rounded-lg border border-slate-200 px-4 py-3">
@@ -143,7 +174,7 @@
               <tr>
                 <td class="py-2">{{ $metric['date'] }}</td>
                 <td class="py-2 text-right font-semibold text-slate-800">{{ $metric['open'] }}</td>
-                <td class="py-2 text-right font-semibold {{ $metric['breaches'] > 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ $metric['breaches'] }}</td>
+                <td class="py-2 text-right font-semibold {{ $metric['breaches'] > 0 ? 'text-orange-600' : 'text-emerald-700' }}">{{ $metric['breaches'] }}</td>
                 <td class="py-2 text-right text-slate-800">{{ $metric['messages'] }}</td>
               </tr>
             @empty

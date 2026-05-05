@@ -19,7 +19,7 @@
         </div>
         <div class="flex flex-wrap gap-3">
           <a href="{{ route('tickets.index') }}" class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            Open Tasks
+            Open Tickets
           </a>
           <a href="{{ route('analytics.index') }}" class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
             Analytics

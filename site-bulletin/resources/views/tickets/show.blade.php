@@ -281,33 +281,53 @@
           @endif
         @endif
 
-        <section class="bg-white shadow-sm rounded-xl px-6 py-5">
-          <h2 class="text-lg font-semibold text-slate-900">Status Timeline</h2>
-          <ul class="mt-4 space-y-4">
+        <section class="bg-white shadow-sm rounded-xl px-4 py-5 sm:px-6">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">Ticket Timeline</h2>
+              <p class="mt-1 text-sm text-slate-600">A plain-language record of status changes, updates, and evidence visible to you.</p>
+            </div>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ $timelineEntries->count() }} events</span>
+          </div>
+          <ol class="mt-5 space-y-4">
             @forelse ($timelineEntries as $entry)
-              @php($change = $entry['change'])
-              <li class="relative border-l-2 border-slate-200 pl-4">
-                <div class="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-blue-500"></div>
-                <p class="text-sm font-semibold text-slate-800">
-                  {{ $entry['headline'] }}
-                  @if ($change->user)
-                    <span class="font-normal text-slate-500">by {{ $change->user->name }}</span>
+              <li class="relative border-l-2 border-slate-200 pl-4 sm:pl-5">
+                <div @class([
+                  'absolute -left-1.5 top-1.5 h-3 w-3 rounded-full ring-4 ring-white',
+                  'bg-blue-500' => $entry['tone'] === 'blue',
+                  'bg-amber-500' => $entry['tone'] === 'amber',
+                  'bg-emerald-500' => $entry['tone'] === 'green',
+                  'bg-slate-400' => $entry['tone'] === 'slate',
+                ])></div>
+                <div class="rounded-lg border border-slate-200 bg-white px-3 py-3 sm:px-4">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-slate-900">{{ $entry['headline'] }}</p>
+                      <p class="mt-1 text-xs text-slate-500">
+                        {{ $entry['created_at']->format('M j, Y H:i') }}
+                        @if ($entry['actor'])
+                          <span>by {{ $entry['actor'] }}</span>
+                        @endif
+                      </p>
+                    </div>
+                    <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">{{ $entry['type'] }}</span>
+                  </div>
+                  <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $entry['detail'] }}</p>
+                  @if ($entry['note'] ?? null)
+                    <p class="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{{ $entry['note'] }}</p>
                   @endif
-                </p>
-                <p class="text-xs text-slate-500">{{ $change->created_at->format('M j, Y H:i') }}</p>
-                <p class="mt-1 text-sm text-slate-600">{{ $entry['detail'] }}</p>
-                @if ($change->reason)
-                  <p class="mt-1 text-sm text-slate-600">{{ $change->reason }}</p>
-                @endif
+                </div>
               </li>
             @empty
-              <li class="text-sm text-slate-500">No status history yet.</li>
+              <li class="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                No ticket activity yet.
+              </li>
             @endforelse
-          </ul>
+          </ol>
         </section>
 
-        <section class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-4">
-          <div class="flex items-center justify-between">
+        <section class="bg-white shadow-sm rounded-xl px-4 py-5 sm:px-6 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-lg font-semibold text-slate-900">Activity &amp; Updates</h2>
             <span class="text-xs text-slate-500">{{ $comments->count() }} notes</span>
           </div>
@@ -315,7 +335,7 @@
           <ul class="space-y-4">
             @forelse ($comments as $comment)
               <li class="rounded-lg border border-slate-200 px-4 py-3">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-2">
                   <p class="text-sm font-semibold text-slate-800">
                     {{ $comment->author->name }}
                     @if ($comment->is_private)
@@ -338,7 +358,7 @@
               @csrf
               <label class="block text-sm font-medium text-slate-700">
                 Add an update
-                <textarea name="body" rows="4" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" required>{{ old('body') }}</textarea>
+                <textarea name="body" rows="4" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>{{ old('body') }}</textarea>
               </label>
               @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
                 <label class="inline-flex items-center gap-2 text-sm text-slate-600">
@@ -346,12 +366,13 @@
                   Private note (requester cannot see)
                 </label>
               @endif
-              <button type="submit" class="inline-flex items-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+              <button type="submit" class="inline-flex min-h-11 items-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
                 Post Comment
               </button>
             </form>
           @endcan
         </section>
+
       </div>
 
       <div class="space-y-6">

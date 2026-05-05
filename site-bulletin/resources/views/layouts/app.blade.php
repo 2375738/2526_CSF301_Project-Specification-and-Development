@@ -35,24 +35,49 @@
 
     $desktopNavItems = [
       ['label' => 'Dashboard', 'route' => route('home'), 'active' => request()->routeIs('home', 'dashboard'), 'icon' => 'dashboard', 'badge' => 0],
-      ['label' => 'Announcements', 'route' => route('announcements.index'), 'active' => request()->routeIs('announcements.*'), 'icon' => 'announcements', 'badge' => $unreadAnnouncementCount],
+    ];
+
+    if ($user?->isEmployee()) {
+      $desktopNavItems[] = ['label' => 'My Work', 'route' => route('my-work.index'), 'active' => request()->routeIs('my-work.*'), 'icon' => 'my-work', 'badge' => 0];
+    }
+
+    $desktopNavItems = array_merge($desktopNavItems, [
       ['label' => 'Messages', 'route' => route('messages.index'), 'active' => request()->routeIs('messages.*'), 'icon' => 'messages', 'badge' => $unreadConversationCount],
       ['label' => 'Knowledge', 'route' => route('knowledge.index'), 'active' => request()->routeIs('knowledge.*'), 'icon' => 'knowledge', 'badge' => 0],
-      ['label' => 'Tasks', 'route' => route('tickets.index'), 'active' => request()->routeIs('tickets.*'), 'icon' => 'tasks', 'badge' => 0],
+      ['label' => 'Tickets', 'route' => route('tickets.index'), 'active' => request()->routeIs('tickets.*'), 'icon' => 'tasks', 'badge' => 0],
       ['label' => 'Profile', 'route' => route('profile.edit'), 'active' => request()->routeIs('profile.*'), 'icon' => 'profile', 'badge' => 0],
-    ];
+    ]);
+
+    if ($showGovernance) {
+      $desktopNavItems[] = ['label' => 'Analytics', 'route' => route('analytics.index'), 'active' => request()->routeIs('analytics.*'), 'icon' => 'analytics', 'badge' => 0];
+    }
 
     if ($showGovernance) {
       $desktopNavItems[] = ['label' => 'Governance', 'route' => route('governance.index'), 'active' => request()->routeIs('governance.*'), 'icon' => 'governance', 'badge' => 0];
     }
 
-    $mobileNavItems = [
-      $desktopNavItems[0],
-      $desktopNavItems[1],
-      $desktopNavItems[2],
-      $desktopNavItems[4],
-      $desktopNavItems[5],
-    ];
+    if ($user?->isEmployee()) {
+      $mobileNavItems = [
+        $desktopNavItems[0],
+        $desktopNavItems[1],
+        $desktopNavItems[2],
+        $desktopNavItems[4],
+        $desktopNavItems[5],
+      ];
+    } else {
+      $mobileNavItems = [
+        $desktopNavItems[0],
+        $desktopNavItems[1],
+        $desktopNavItems[3],
+        $desktopNavItems[5] ?? $desktopNavItems[4],
+      ];
+
+      if ($showGovernance) {
+        $mobileNavItems[] = ['label' => 'More', 'route' => route('governance.index'), 'active' => request()->routeIs('governance.*', 'analytics.*'), 'icon' => 'governance', 'badge' => 0];
+      } else {
+        $mobileNavItems[] = $desktopNavItems[2];
+      }
+    }
 
     $userInitials = $user
       ? collect(explode(' ', trim($user->name)))
@@ -83,7 +108,7 @@
   >
     @auth
       <aside
-        class="hidden lg:flex lg:flex-col border-r border-slate-200 bg-white transition-all duration-200"
+        class="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start border-r border-slate-200 bg-white transition-all duration-200"
         :class="sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'"
       >
         <div x-show="!scrolled" x-transition.opacity class="border-b border-slate-200 px-4 py-4">
@@ -259,23 +284,24 @@
     </div>
   </div>
   @auth
-    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
-      <div class="grid grid-cols-5 gap-1 px-2 py-2.5">
+    <nav class="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div class="grid grid-cols-5 gap-1 px-2 py-2">
         @foreach ($mobileNavItems as $item)
           <a
             href="{{ $item['route'] }}"
-            class="rounded-2xl px-1.5 py-2 text-[10px] tracking-tight transition {{ $item['active'] ? 'bg-gradient-to-b from-blue-50 to-blue-100/90 text-blue-700 shadow-sm ring-1 ring-blue-100' : 'text-slate-400 hover:bg-slate-100/90 hover:text-slate-700' }}"
+            @if ($item['active']) aria-current="page" @endif
+            class="rounded-xl px-1 py-1.5 text-[10px] tracking-tight transition {{ $item['active'] ? 'text-blue-700' : 'text-slate-500 hover:bg-slate-100/90 hover:text-slate-800' }}"
           >
-            <span class="mx-auto flex w-full flex-col items-center gap-1.5">
-              <span class="relative inline-flex items-center justify-center rounded-2xl {{ $item['active'] ? 'bg-white/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]' : 'p-1.5' }}">
-                <x-nav-icon :name="$item['icon']" class="{{ $item['active'] ? 'h-5.5 w-5.5 text-blue-700' : 'h-5 w-5 text-slate-400' }}" />
+            <span class="mx-auto flex w-full flex-col items-center gap-1">
+              <span class="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl transition {{ $item['active'] ? 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100' : 'bg-slate-100 text-slate-500' }}">
+                <x-nav-icon :name="$item['icon']" class="{{ $item['active'] ? 'h-6 w-6' : 'h-5 w-5' }}" />
                 @if (($item['badge'] ?? 0) > 0)
                   <span class="badge-pulse-soft absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white shadow-sm">
                     {{ $item['badge'] > 9 ? '9+' : $item['badge'] }}
                   </span>
                 @endif
               </span>
-              <span class="leading-none {{ $item['active'] ? 'font-semibold text-blue-700' : 'font-medium text-slate-500' }}">{{ $item['label'] }}</span>
+              <span class="max-w-full truncate leading-none {{ $item['active'] ? 'font-semibold text-blue-700' : 'font-medium text-slate-500' }}">{{ $item['label'] }}</span>
             </span>
           </a>
         @endforeach

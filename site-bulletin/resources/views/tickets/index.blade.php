@@ -2,19 +2,19 @@
 
 @section('content')
   <div class="space-y-6">
-    <div class="bg-white shadow-sm rounded-xl px-6 py-5">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <div class="bg-white shadow-sm rounded-xl px-5 py-5 sm:px-6">
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
           <h1 class="text-xl font-semibold text-slate-900">My Tickets</h1>
-          <p class="mt-1 text-sm text-slate-600">
+          <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
             Track open issues, see status updates, and share more details with the site team.
           </p>
         </div>
-        <div class="flex flex-wrap gap-3">
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
           @if (auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
             <a
               href="{{ route('tickets.approvals.index') }}"
-              class="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              class="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
             >
               Approval workbench
             </a>
@@ -22,15 +22,16 @@
           @if (auth()->user()->hasRole('ops_manager', 'hr', 'admin'))
             <a
               href="{{ route('tickets.triage') }}"
-              class="inline-flex items-center justify-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              class="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
             >
               Open triage board
             </a>
           @endif
           <a
             href="{{ route('tickets.create') }}"
-            class="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:min-w-36"
           >
+            <span class="inline-flex h-5 w-5 items-center justify-center rounded-md bg-white/15 text-base leading-none" aria-hidden="true">+</span>
             Report issue
           </a>
         </div>

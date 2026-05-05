@@ -45,10 +45,17 @@ class TicketUpdated extends Notification
     {
         return [
             'ticket_id' => $this->ticket->id,
-            'title' => $this->ticket->title,
+            'title' => 'Ticket #' . $this->ticket->id . ': ' . $this->ticket->title,
             'action' => $this->action, // e.g., "updated", "resolved", "commented"
+            'action_label' => match ($this->action) {
+                'resolved' => 'Review fix',
+                'commented' => 'Read update',
+                'assigned' => 'Open ticket',
+                default => 'View ticket',
+            },
             'performer_name' => $this->performer->name,
             'url' => route('tickets.show', $this->ticket),
+            'type' => 'ticket',
             'message' => "Ticket #{$this->ticket->id} was {$this->action} by {$this->performer->name}",
         ];
     }
