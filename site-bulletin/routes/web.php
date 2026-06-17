@@ -21,7 +21,7 @@ use App\Http\Controllers\Messaging\MessageAttachmentController;
 use App\Http\Controllers\Messaging\MessageController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', DashboardController::class)->name('home');
+Route::get('/', fn () => redirect()->route('dashboard'))->middleware('auth')->name('home');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

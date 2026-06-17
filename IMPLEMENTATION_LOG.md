@@ -2165,3 +2165,12 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
 - Validation:
   - `php artisan test tests/Feature/Tickets/TicketIndexViewTest.php`
   - `npm run build`
+## 2026-06-17 - Authenticated home routing fix
+- Scope: public home route and dashboard routing regression tests.
+- Reason: the application root was rendering the dashboard controller without auth middleware, which made the start URL behave differently from `/dashboard` and could leave users thinking login routing was broken.
+- Change:
+  - made `/` an authenticated entry route that redirects signed-in users to `/dashboard`
+  - allowed guests hitting `/` to flow through Laravel's auth redirect to `/login`
+  - replaced the stale public-dashboard placeholder test with explicit guest and authenticated routing assertions
+- Validation:
+  - `php artisan test tests/Feature/PublicDashboardTest.php tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/Auth/AuthenticationTest.php tests/Feature/Auth/DemoLoginTest.php`
