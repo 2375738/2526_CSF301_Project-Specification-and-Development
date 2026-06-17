@@ -6,36 +6,6 @@
     $messagePreview = $messagePreview ?? collect();
     $unreadConversationCount = $unreadConversationCount ?? 0;
     $isEmployeeDashboard = auth()->check() && auth()->user()->isEmployee() && ! empty($employeeWorkToday);
-
-    $categoryIconSvg = function ($categoryName) {
-        $name = \Illuminate\Support\Str::of((string) $categoryName)->lower();
-
-        if ($name->contains('hot topics')) {
-            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.25 4.5a.75.75 0 011.28-.53l3.75 3.75a.75.75 0 01.22.53v3.5a.75.75 0 01-.22.53l-3.75 3.75a.75.75 0 01-1.28-.53v-2.2l-4.13-.83a1.75 1.75 0 01-1.37-1.71V9.24c0-.83.58-1.55 1.39-1.72l4.11-.81V4.5z" /><path d="M4.75 8.75A1.75 1.75 0 003 10.5v.5a1.75 1.75 0 001.75 1.75h.75v-4h-.75z" /></svg>';
-        }
-
-        if ($name->contains('vacancies')) {
-            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 4.75A1.75 1.75 0 018.75 3h2.5A1.75 1.75 0 0113 4.75V6h2.25A1.75 1.75 0 0117 7.75v5.5A1.75 1.75 0 0115.25 15H4.75A1.75 1.75 0 013 13.25v-5.5A1.75 1.75 0 014.75 6H7V4.75zM8.5 6h3V4.75a.25.25 0 00-.25-.25h-2.5a.25.25 0 00-.25.25V6z" /></svg>';
-        }
-
-        if ($name->contains('my site')) {
-            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M4.75 2.5A1.75 1.75 0 003 4.25v11.5C3 16.44 3.56 17 4.25 17h11.5c.69 0 1.25-.56 1.25-1.25v-8.5a.75.75 0 00-.22-.53l-3.5-3.5A.75.75 0 0012.75 3h-8zM6 6.25A.75.75 0 016.75 5.5h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016 6.25zm0 3A.75.75 0 016.75 8.5h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016 9.25zm0 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016 12.25zm5-6a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0111 6.25zm0 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75zm0 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75z" /></svg>';
-        }
-
-        if ($name->contains('diversity') || $name->contains('equity') || $name->contains('inclusion')) {
-            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2.5a.75.75 0 01.72.54l1.02 3.32 3.32 1.02a.75.75 0 010 1.44l-3.32 1.02-1.02 3.32a.75.75 0 01-1.44 0l-1.02-3.32-3.32-1.02a.75.75 0 010-1.44l3.32-1.02 1.02-3.32A.75.75 0 0110 2.5z" /><path d="M15.5 12.5a.75.75 0 01.72.54l.34 1.1 1.1.34a.75.75 0 010 1.44l-1.1.34-.34 1.1a.75.75 0 01-1.44 0l-.34-1.1-1.1-.34a.75.75 0 010-1.44l1.1-.34.34-1.1a.75.75 0 01.72-.54zM4.5 12.75a.75.75 0 01.72.54l.2.65.65.2a.75.75 0 010 1.44l-.65.2-.2.65a.75.75 0 01-1.44 0l-.2-.65-.65-.2a.75.75 0 010-1.44l.65-.2.2-.65a.75.75 0 01.72-.54z" /></svg>';
-        }
-
-        if ($name->contains('site tools')) {
-            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.62 2.96a4.5 4.5 0 00-5.67 5.67L2.72 11.87a1.75 1.75 0 102.47 2.47l3.24-3.23a4.5 4.5 0 005.67-5.67l-2.12 2.12a1.5 1.5 0 11-2.12-2.12l2.12-2.12z" /></svg>';
-        }
-
-        if ($name->contains('pxt') || $name->contains('hr')) {
-            return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.5 8.25a2.75 2.75 0 100-5.5 2.75 2.75 0 000 5.5zM13.5 9.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5zM2.5 15.25A3.75 3.75 0 016.25 11.5h.5A3.75 3.75 0 0110.5 15.25V16H2.5v-.75zM11.5 16v-.75c0-1.06-.34-2.04-.91-2.84a3.24 3.24 0 012.16-.81h.5A3.75 3.75 0 0117 15.25V16h-5.5z" /></svg>';
-        }
-
-        return '<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 4A2.25 2.25 0 002 6.25v7.5A2.25 2.25 0 004.25 16h11.5A2.25 2.25 0 0018 13.75v-7.5A2.25 2.25 0 0015.75 4H4.25zM5.5 8.25A.75.75 0 016.25 7.5h4.5a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75zm0 3a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg>';
-    };
 @endphp
 
 <div class="space-y-10">
@@ -143,6 +113,10 @@
       'employeeWorkToday' => $employeeWorkToday ?? null,
   ])
 
+  @include('dashboard.partials.next-actions', [
+      'roleActions' => $roleActions ?? collect(),
+  ])
+
   @auth
     @if (! $isEmployeeDashboard)
     <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -172,6 +146,14 @@
 
   @include('dashboard.partials.manager-attention-queue', [
       'managerAttentionQueue' => $managerAttentionQueue ?? null,
+  ])
+
+  @include('dashboard.partials.prevention-panel', [
+      'managerPreventionInsights' => $managerPreventionInsights ?? null,
+  ])
+
+  @include('dashboard.partials.hr-workspace', [
+      'hrWorkspace' => $hrWorkspace ?? null,
   ])
 
   @include('dashboard.partials.trend-panels', [
@@ -206,9 +188,6 @@
     @else
       <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         @foreach ($categories as $category)
-          @php
-              $iconSvg = $categoryIconSvg($category->name);
-          @endphp
           <div class="flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex items-center justify-between">
               <div>
@@ -216,7 +195,7 @@
                 <h3 class="text-lg font-semibold text-slate-900">{{ $category->name }}</h3>
               </div>
               <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/5 text-slate-600">
-                {!! $iconSvg !!}
+                <x-category-icon :name="$category->name" />
               </span>
             </div>
             <div class="flex flex-wrap items-center gap-2">

@@ -6,6 +6,7 @@ use App\Console\Commands\BackfillDemoOperationsData;
 use App\Console\Commands\RecalculateDepartmentMetrics;
 use App\Console\Commands\RecalculateTicketSLA;
 use App\Console\Commands\SendAnalyticsDigest;
+use App\Console\Commands\SystemReadinessCheck;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -16,11 +17,15 @@ class Kernel extends ConsoleKernel
         RecalculateTicketSLA::class,
         RecalculateDepartmentMetrics::class,
         SendAnalyticsDigest::class,
+        SystemReadinessCheck::class,
     ];
 
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('demo:backfill-ops-data')->everyFifteenMinutes();
+        if (config('site_bulletin.demo_simulation_enabled')) {
+            $schedule->command('demo:backfill-ops-data')->everyFifteenMinutes();
+        }
+
         $schedule->command('tickets:recalculate-sla')->dailyAt('00:30');
         $schedule->command('analytics:recalculate-departments')->dailyAt('01:00');
         $schedule->command('analytics:send-digest')->weekdays()->at('07:00');

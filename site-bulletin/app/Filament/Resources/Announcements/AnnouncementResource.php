@@ -8,6 +8,7 @@ use App\Filament\Resources\Announcements\Pages\ListAnnouncements;
 use App\Filament\Resources\Announcements\Schemas\AnnouncementForm;
 use App\Filament\Resources\Announcements\Tables\AnnouncementsTable;
 use App\Models\Announcement;
+use App\Services\RoleScopeService;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -70,7 +71,10 @@ class AnnouncementResource extends Resource
 
     public static function canEdit($record): bool
     {
-        return static::canCreate();
+        $user = auth()->user();
+
+        return $user && static::canCreate()
+            && app(RoleScopeService::class)->canManageDepartment($user, $record->department_id);
     }
 
     public static function canDelete($record): bool

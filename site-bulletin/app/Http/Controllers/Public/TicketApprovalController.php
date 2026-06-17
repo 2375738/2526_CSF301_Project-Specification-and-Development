@@ -7,11 +7,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Ticket;
 use App\Models\TicketApproval;
 use App\Services\AuditLogger;
+use App\Services\RoleScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class TicketApprovalController extends Controller
 {
+    public function __construct(protected RoleScopeService $roleScope)
+    {
+    }
+
     public function update(Request $request, Ticket $ticket, TicketApproval $approval, AuditLogger $auditLogger): RedirectResponse
     {
         abort_unless($approval->ticket_id === $ticket->id, 404);
@@ -103,17 +108,11 @@ class TicketApprovalController extends Controller
         }
 
         if ($approval->approver_role === 'manager') {
-            if ($user->hasRole('hr', 'admin')) {
+            if ($this->roleScope->canManageAllDepartments($user)) {
                 return true;
             }
 
-            if (! $user->hasRole('manager', 'ops_manager')) {
-                return false;
-            }
-
-            $managedDepartmentIds = $user->managedDepartments()->pluck('departments.id');
-
-            return $ticket->department_id !== null && $managedDepartmentIds->contains($ticket->department_id);
+            return $this->roleScope->canManageDepartment($user, $ticket->department_id);
         }
 
         return false;

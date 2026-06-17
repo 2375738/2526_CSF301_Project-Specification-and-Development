@@ -36,7 +36,7 @@ class PublicDashboardNewsWidgetTest extends TestCase
         $read->markReadFor($user);
 
         $this->actingAs($user)
-            ->get(route('dashboard'))
+            ->get(route('home'))
             ->assertOk()
             ->assertSeeText('Latest News & Updates')
             ->assertSeeText('Urgent Safety Update')

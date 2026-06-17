@@ -8,6 +8,7 @@ use App\Filament\Resources\Categories\Pages\ListCategories;
 use App\Filament\Resources\Categories\Schemas\CategoryForm;
 use App\Filament\Resources\Categories\Tables\CategoriesTable;
 use App\Models\Category;
+use App\Services\RoleScopeService;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -70,7 +71,10 @@ class CategoryResource extends Resource
 
     public static function canEdit($record): bool
     {
-        return static::canCreate();
+        $user = auth()->user();
+
+        return $user && static::canCreate()
+            && app(RoleScopeService::class)->canManageDepartment($user, $record->department_id);
     }
 
     public static function canDelete($record): bool

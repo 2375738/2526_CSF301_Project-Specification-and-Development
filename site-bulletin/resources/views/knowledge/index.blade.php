@@ -23,9 +23,9 @@
       </div>
       <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         @if ($search !== '')
-          Showing {{ $snippets->count() }} result{{ $snippets->count() === 1 ? '' : 's' }} for <span class="font-semibold text-slate-900">"{{ $search }}"</span>.
+          Showing grouped help results for <span class="font-semibold text-slate-900">"{{ $search }}"</span>.
         @else
-          Search scanner resets, missed punches, transport issues, or other quick operational answers.
+          Search scanner resets, missed punches, transport issues, updates, or quick links.
         @endif
       </div>
     </div>
@@ -50,6 +50,46 @@
         @endif
       </div>
     </form>
+
+    @if ($search !== '')
+      <section class="grid gap-4 xl:grid-cols-3">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 class="text-base font-semibold text-slate-900">Quick links</h2>
+          <div class="mt-3 space-y-2">
+            @forelse (($quickLinks ?? collect()) as $link)
+              <a href="{{ $link->url }}" target="_blank" rel="noopener noreferrer" class="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:border-blue-200 hover:bg-blue-50">
+                <span class="font-semibold text-slate-900">{{ $link->label }}</span>
+                <span class="mt-1 block text-xs text-slate-500">{{ $link->category?->name ?? 'Resource' }}</span>
+              </a>
+            @empty
+              <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">No quick links matched.</p>
+            @endforelse
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 class="text-base font-semibold text-slate-900">Announcements</h2>
+          <div class="mt-3 space-y-2">
+            @forelse (($announcements ?? collect()) as $announcement)
+              <a href="{{ route('announcements.show', $announcement) }}" class="block rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm hover:border-blue-200 hover:bg-blue-50">
+                <span class="font-semibold text-slate-900">{{ $announcement->title }}</span>
+                <span class="mt-1 block text-xs text-slate-500">{{ ucfirst($announcement->priority) }} priority</span>
+              </a>
+            @empty
+              <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">No announcements matched.</p>
+            @endforelse
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <h2 class="text-base font-semibold text-blue-950">Still need help?</h2>
+          <p class="mt-2 text-sm text-blue-900">If the results do not answer the issue, start a guided report and choose the closest path.</p>
+          <a href="{{ route('tickets.create', ['guide_area' => 'equipment']) }}" class="mt-4 inline-flex items-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            Start guided report
+          </a>
+        </div>
+      </section>
+    @endif
 
     <section class="grid gap-4 xl:grid-cols-2">
       @forelse ($snippets as $snippet)

@@ -11,6 +11,7 @@ use App\Models\TicketApproval;
 use App\Models\TicketComment;
 use App\Models\TicketStatusChange;
 use App\Models\User;
+use App\Services\RoleScopeService;
 use App\Services\SLAService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
@@ -19,9 +20,19 @@ use Illuminate\View\View;
 
 class TicketViewController extends Controller
 {
+    public function __construct(protected RoleScopeService $roleScope)
+    {
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();
+        $employeeTicketTabs = collect();
+        $activeEmployeeTicketTab = $request->input('queue', 'all');
+
+        if (! in_array($activeEmployeeTicketTab, ['all', 'needs_me', 'in_progress', 'waiting_on_team', 'resolved'], true)) {
+            $activeEmployeeTicketTab = 'all';
+        }
 
         $query = Ticket::query()
             ->with(['category', 'assignee', 'requester', 'createdFor', 'department'])
@@ -35,11 +46,21 @@ class TicketViewController extends Controller
             );
 
         if ($request->filled('department_id')) {
-            $query->where('department_id', $request->integer('department_id'));
+            $departmentId = $request->integer('department_id');
+            abort_unless($this->roleScope->canViewDepartment($user, $departmentId), 403);
+            $query->where('department_id', $departmentId);
         }
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->integer('category_id'));
+        }
+
+        if ($request->filled('template_key')) {
+            $query->where('template_key', (string) $request->input('template_key'));
+        }
+
+        if ($request->filled('location')) {
+            $query->where('location', (string) $request->input('location'));
         }
 
         if ($request->boolean('unassigned')) {
@@ -72,6 +93,8 @@ class TicketViewController extends Controller
         }
 
         if ($user->isManager() || $user->isHr()) {
+            $this->roleScope->applyViewableDepartmentScope($query, $user);
+
             if ($request->boolean('mine')) {
                 $query->where('assignee_id', $user->id);
             } else {
@@ -82,6 +105,12 @@ class TicketViewController extends Controller
                 $q->where('requester_id', $user->id)
                     ->orWhere('created_for_id', $user->id);
             });
+
+            $employeeTicketTabs = $this->buildEmployeeTicketTabs($user, $activeEmployeeTicketTab);
+
+            if (! $request->filled('status')) {
+                $this->applyEmployeeTicketTab($query, $activeEmployeeTicketTab);
+            }
         }
 
         $tickets = $query
@@ -91,10 +120,8 @@ class TicketViewController extends Controller
 
         $departmentFilterOptions = collect();
 
-        if ($user->hasRole('hr', 'admin', 'ops_manager')) {
-            $departmentFilterOptions = \App\Models\Department::orderBy('name')->pluck('name', 'id');
-        } elseif ($user->isManager()) {
-            $departmentFilterOptions = $user->managedDepartments()->orderBy('departments.name')->pluck('departments.name', 'departments.id');
+        if ($user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
+            $departmentFilterOptions = $this->roleScope->departmentOptionsForManagement($user);
         } elseif ($user->primaryDepartment) {
             $departmentFilterOptions = collect([$user->primaryDepartment])->filter()->mapWithKeys(fn ($dept) => [$dept->id => $dept->name]);
         }
@@ -112,10 +139,12 @@ class TicketViewController extends Controller
 
         return view('tickets.index', [
             'tickets' => $tickets,
-            'filters' => $request->only(['status', 'search', 'mine', 'department_id', 'overdue', 'breached', 'from_date', 'to_date', 'category_id', 'unassigned']),
+            'filters' => $request->only(['status', 'search', 'mine', 'department_id', 'overdue', 'breached', 'from_date', 'to_date', 'category_id', 'template_key', 'location', 'unassigned', 'queue']),
             'departmentFilterOptions' => $departmentFilterOptions,
             'categoryFilterOptions' => $categoryFilterOptions,
             'approvalQueue' => $approvalQueue,
+            'employeeTicketTabs' => $employeeTicketTabs,
+            'activeEmployeeTicketTab' => $activeEmployeeTicketTab,
         ]);
     }
 
@@ -157,7 +186,7 @@ class TicketViewController extends Controller
         $templateMeta = $ticket->template_key
             ? collect(config('ticket_templates', []))->get($ticket->template_key)
             : null;
-        $approvalSummary = $ticket->approvals->map(function ($approval) {
+        $approvalSummary = $ticket->approvals->map(function ($approval) use ($request, $ticket) {
             return [
                 'id' => $approval->id,
                 'step_order' => $approval->step_order,
@@ -169,6 +198,7 @@ class TicketViewController extends Controller
                 'internal_note' => $approval->internal_note,
                 'approver_name' => $approval->approver?->name,
                 'decided_at' => $approval->decided_at,
+                'can_approve' => $this->canDecideApproval($request->user(), $ticket, $approval),
             ];
         });
         $approvalContext = $this->buildApprovalContext($ticket->approvals);
@@ -201,11 +231,11 @@ class TicketViewController extends Controller
             ->whereHas('approvals', function ($approvalQuery) use ($user) {
                 $approvalQuery->where('status', \App\Models\TicketApproval::STATUS_PENDING);
 
-                if ($user->hasRole('hr', 'admin')) {
+                if ($this->roleScope->canManageAllDepartments($user)) {
                     return;
                 }
 
-                $managedDepartmentIds = $user->managedDepartments()->pluck('departments.id');
+                $managedDepartmentIds = $this->roleScope->manageableDepartmentIds($user) ?? collect();
 
                 $approvalQuery->where('approver_role', 'manager');
                 $approvalQuery->whereHas('ticket', fn ($ticketQuery) => $ticketQuery->whereIn('department_id', $managedDepartmentIds));
@@ -281,6 +311,91 @@ class TicketViewController extends Controller
             'requester_status' => $requesterStatus,
             'requester_note' => $requesterNote,
         ];
+    }
+
+    protected function employeeTicketsQuery(User $user): \Illuminate\Database\Eloquent\Builder
+    {
+        return Ticket::query()
+            ->where(function ($query) use ($user) {
+                $query->where('requester_id', $user->id)
+                    ->orWhere('created_for_id', $user->id);
+            });
+    }
+
+    protected function buildEmployeeTicketTabs(User $user, string $active): Collection
+    {
+        return collect([
+            [
+                'key' => 'all',
+                'label' => 'All',
+                'description' => 'Every ticket you reported or that was created for you.',
+                'count' => (clone $this->employeeTicketsQuery($user))->count(),
+            ],
+            [
+                'key' => 'needs_me',
+                'label' => 'Needs me',
+                'description' => 'Reply, add detail, or confirm the fix.',
+                'count' => (clone $this->employeeTicketsQuery($user))
+                    ->whereIn('status', [TicketStatus::WaitingEmployee, TicketStatus::Resolved])
+                    ->count(),
+            ],
+            [
+                'key' => 'in_progress',
+                'label' => 'In progress',
+                'description' => 'Accepted work that is moving with the team.',
+                'count' => (clone $this->employeeTicketsQuery($user))
+                    ->whereIn('status', [TicketStatus::Triaged, TicketStatus::InProgress, TicketStatus::Reopened])
+                    ->count(),
+            ],
+            [
+                'key' => 'waiting_on_team',
+                'label' => 'Waiting on team',
+                'description' => 'Logged and waiting for first review or assignment.',
+                'count' => (clone $this->employeeTicketsQuery($user))
+                    ->where('status', TicketStatus::New)
+                    ->count(),
+            ],
+            [
+                'key' => 'resolved',
+                'label' => 'Resolved',
+                'description' => 'Resolved, closed, or no longer active.',
+                'count' => (clone $this->employeeTicketsQuery($user))
+                    ->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed, TicketStatus::Cancelled])
+                    ->count(),
+            ],
+        ])->map(function (array $tab) use ($active) {
+            $tab['active'] = $tab['key'] === $active;
+
+            return $tab;
+        });
+    }
+
+    protected function applyEmployeeTicketTab($query, string $tab): void
+    {
+        match ($tab) {
+            'needs_me' => $query->whereIn('status', [TicketStatus::WaitingEmployee, TicketStatus::Resolved]),
+            'in_progress' => $query->whereIn('status', [TicketStatus::Triaged, TicketStatus::InProgress, TicketStatus::Reopened]),
+            'waiting_on_team' => $query->where('status', TicketStatus::New),
+            'resolved' => $query->whereIn('status', [TicketStatus::Resolved, TicketStatus::Closed, TicketStatus::Cancelled]),
+            default => null,
+        };
+    }
+
+    protected function canDecideApproval(User $user, Ticket $ticket, TicketApproval $approval): bool
+    {
+        if ($approval->status !== TicketApproval::STATUS_PENDING) {
+            return false;
+        }
+
+        if ($approval->approver_role === 'hr') {
+            return $user->hasRole('hr', 'admin');
+        }
+
+        if ($approval->approver_role === 'manager') {
+            return $this->roleScope->canManageDepartment($user, $ticket->department_id);
+        }
+
+        return false;
     }
 
     /**

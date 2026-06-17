@@ -56,6 +56,13 @@
         {!! nl2br(e($ticket->description)) !!}
       </div>
 
+      @if ($ticket->category?->is_sensitive && auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin'))
+        <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+          <p class="font-semibold">Sensitive case handling</p>
+          <p class="mt-1">Use public updates for requester-facing decisions and private notes for HR-only evidence, deliberation, or internal context.</p>
+        </div>
+      @endif
+
       @if (! empty($ticket->details_json))
         <div class="mt-4 rounded-lg border border-slate-200 bg-white px-4 py-4">
           <h2 class="text-sm font-semibold text-slate-900">Structured Details</h2>
@@ -201,23 +208,7 @@
                   </div>
                 @endif
 
-                @php
-                  $canApprove = false;
-
-                  if ($approval['approver_role'] === 'hr') {
-                      $canApprove = auth()->user()->hasRole('hr', 'admin');
-                  } elseif ($approval['approver_role'] === 'manager') {
-                      $managedDepartmentIds = auth()->user()->managedDepartments()->pluck('departments.id');
-                      $canApprove = auth()->user()->hasRole('hr', 'admin')
-                          || (
-                              auth()->user()->hasRole('manager', 'ops_manager')
-                              && $ticket->department_id
-                              && $managedDepartmentIds->contains($ticket->department_id)
-                          );
-                  }
-                @endphp
-
-                @if ($approval['status'] === 'pending' && $canApprove)
+                @if ($approval['status'] === 'pending' && ($approval['can_approve'] ?? false))
                   <form action="{{ route('tickets.approvals.update', [$ticket, $approval['id']]) }}" method="POST" class="space-y-3">
                     @csrf
                     @method('PATCH')

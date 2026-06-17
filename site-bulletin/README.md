@@ -72,6 +72,7 @@ The app supports role-based experiences for:
 | Role | Email | Password |
 |------|-------|----------|
 | Admin | `admin@example.com` | `password` |
+| Ops Manager | `ops@example.com` | `password` |
 | Manager | `manager@example.com` | `password` |
 | HR | `hr@example.com` | `password` |
 | Employee | `employee@example.com` | `password` |
@@ -154,6 +155,17 @@ For a normal cron-based setup:
 ```bash
 * * * * * php /path/to/site-bulletin/artisan schedule:run
 ```
+
+## Production-Facing Demo Controls
+These environment flags keep demo conveniences explicit:
+
+```bash
+SITE_BULLETIN_DEMO_LOGIN_ENABLED=false
+SITE_BULLETIN_DEMO_SIMULATION_ENABLED=false
+SITE_BULLETIN_PROTOTYPE_FOOTER_ENABLED=false
+```
+
+If `SITE_BULLETIN_DEMO_LOGIN_ENABLED` is unset, demo login remains available in `local` and `testing` environments, or when `APP_DEBUG=true`.
 
 ## Demo Data Model
 

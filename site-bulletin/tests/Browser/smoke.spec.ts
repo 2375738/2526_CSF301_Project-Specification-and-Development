@@ -8,16 +8,16 @@ async function loginWithPreset(page: Page, role: 'Employee' | 'Manager') {
 }
 
 async function logout(page: Page) {
-  await page.getByRole('button', { name: 'Logout' }).click();
+  await page.getByRole('button', { name: 'Log Out' }).click();
   await expect(page).toHaveURL(/\/$/);
 }
 
 test('manager demo login exposes the full navigation shell', async ({ page }) => {
   await loginWithPreset(page, 'Manager');
 
-  await expect(page.getByRole('link', { name: 'Announcements' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Messages' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Tasks', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Knowledge' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Tickets', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Governance', exact: true })).toBeVisible();
 });
 

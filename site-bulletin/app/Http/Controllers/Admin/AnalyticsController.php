@@ -10,9 +10,10 @@ use App\Models\SavedAnalyticsView;
 use App\Models\Ticket;
 use App\Services\AnalyticsExportService;
 use App\Services\DepartmentAnalyticsService;
+use App\Services\RoleScopeService;
 use App\Services\SLAService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -20,9 +21,12 @@ use Illuminate\Validation\Rule;
 
 class AnalyticsController extends Controller
 {
-    public function index(Request $request, SLAService $slaService, DepartmentAnalyticsService $deptAnalytics)
+    public function index(Request $request, SLAService $slaService, DepartmentAnalyticsService $deptAnalytics, RoleScopeService $roleScope)
     {
-        $openByPriority = Ticket::query()
+        $user = $request->user();
+        $ticketScope = fn (Builder $query) => $roleScope->applyViewableDepartmentScope($query, $user, 'tickets.department_id');
+
+        $openByPriority = $ticketScope(Ticket::query())
             ->select('priority', DB::raw('count(*) as total'))
             ->whereIn('status', array_map(fn ($status) => $status->value, TicketStatus::open()))
             ->groupBy('priority')
@@ -31,7 +35,7 @@ class AnalyticsController extends Controller
             ->mapWithKeys(fn ($row) => [$row->priority?->value ?? $row->priority => $row->total]);
 
         $since = Carbon::now()->subDays(30);
-        $recentTickets = Ticket::with(['category', 'assignee'])
+        $recentTickets = $ticketScope(Ticket::with(['category', 'assignee']))
             ->where('created_at', '>=', $since)
             ->get();
 
@@ -47,13 +51,13 @@ class AnalyticsController extends Controller
             ->filter()
             ->avg();
 
-        $breachesLastWeek = Ticket::with('category')
+        $breachesLastWeek = $ticketScope(Ticket::with('category'))
             ->where('updated_at', '>=', Carbon::now()->subDays(7))
             ->get()
             ->filter(fn (Ticket $ticket) => ($evaluation = $slaService->evaluate($ticket)) && ($evaluation['first_response_breached'] || $evaluation['resolution_breached']))
             ->count();
 
-        $topCategories = Ticket::query()
+        $topCategories = $ticketScope(Ticket::query())
             ->leftJoin('categories', 'tickets.category_id', '=', 'categories.id')
             ->select(DB::raw('COALESCE(categories.name, "Uncategorised") as category_name'), DB::raw('count(*) as total'))
             ->groupBy('category_name')
@@ -79,6 +83,12 @@ class AnalyticsController extends Controller
             }
         }
 
+        if ($departmentId !== null) {
+            abort_unless($roleScope->canViewDepartment($user, $departmentId), 403);
+        } elseif (! $roleScope->canViewAllDepartments($user)) {
+            $departmentId = $roleScope->viewableDepartmentIds($user)?->first();
+        }
+
         $trendStart = Carbon::now()->subDays($trendDays - 1)->startOfDay();
 
         for ($i = 0; $i < $trendDays; $i++) {
@@ -102,7 +112,11 @@ class AnalyticsController extends Controller
                 'messages' => $metric->messages_sent,
             ]);
 
-        $departmentOptions = Department::orderBy('name')->pluck('name', 'id');
+        $departmentIds = $roleScope->viewableDepartmentIds($user);
+        $departmentOptions = Department::query()
+            ->when($departmentIds !== null, fn ($query) => $query->whereIn('id', $departmentIds))
+            ->orderBy('name')
+            ->pluck('name', 'id');
 
         return view('admin.analytics', [
             'openByPriority' => $openByPriority,
@@ -120,7 +134,7 @@ class AnalyticsController extends Controller
         ]);
     }
 
-    public function storeView(Request $request)
+    public function storeView(Request $request, RoleScopeService $roleScope)
     {
         $this->authorize('viewAny', Ticket::class);
 
@@ -130,13 +144,17 @@ class AnalyticsController extends Controller
             'days' => ['required', Rule::in([7, 14, 30])],
         ]);
 
+        $departmentId = $data['department_id'] ?? null;
+        abort_unless($departmentId === null || $roleScope->canViewDepartment($request->user(), (int) $departmentId), 403);
+        abort_unless($departmentId !== null || $roleScope->canViewAllDepartments($request->user()), 403);
+
         /** @var SavedAnalyticsView $view */
         $view = $request->user()
             ->savedAnalyticsViews()
             ->updateOrCreate([
                 'name' => $data['name'],
             ], [
-                'department_id' => $data['department_id'] ?? null,
+                'department_id' => $departmentId,
                 'days' => $data['days'],
             ]);
 
@@ -154,7 +172,7 @@ class AnalyticsController extends Controller
             'Content-Disposition' => 'attachment; filename="site-analytics.csv"',
         ];
 
-        $exportData = $exporter->generateTicketExport();
+        $exportData = $exporter->generateTicketExport(request()->user());
 
         $callback = function () use ($exporter, $exportData) {
             $handle = fopen('php://output', 'w');

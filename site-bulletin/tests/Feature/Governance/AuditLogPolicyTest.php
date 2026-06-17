@@ -43,4 +43,12 @@ class AuditLogPolicyTest extends TestCase
 
         $this->assertTrue(Gate::forUser($hr)->allows('view', $log));
     }
+
+    public function test_ops_manager_can_view_any_audit_log_as_site_wide_role(): void
+    {
+        $opsManager = User::factory()->create(['role' => 'ops_manager']);
+        $log = AuditLog::factory()->create();
+
+        $this->assertTrue(Gate::forUser($opsManager)->allows('view', $log));
+    }
 }

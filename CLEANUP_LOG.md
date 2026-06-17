@@ -71,3 +71,30 @@ Remove the unused TypeScript implementation-guide bundle so the repository conta
 
 ### Notes
 The implementation guide had become historical reference only. Runtime, seeding, and testing all now depend solely on the Laravel application in `site-bulletin/`.
+
+## 2026-06-17 - Laravel App Scope Cleanup
+
+### Objective
+Keep the repository focused on the active Laravel implementation and avoid reintroducing local coursework/editor artifacts into version control.
+
+### Removed
+- `site-bulletin/docs/disclaimer.md`
+- `site-bulletin/docs/outline.md`
+- `site-bulletin/docs/phase-0-baseline.md`
+- `site-bulletin/docs/phase-1-foundation-plan.md`
+- `site-bulletin/docs/phase-3-messaging-plan.md`
+- `site-bulletin/docs/risk-register.csv`
+
+### Added
+- root `.gitignore` for local `.vscode/` settings and root-level PDF coursework exports
+
+### Retained (Intentional)
+- `site-bulletin/`
+- `data/`
+- root governance docs
+- current implementation docs in `site-bulletin/docs/role-scenario-*.md`
+
+### Validation
+- `php artisan test`
+- `npm run build`
+- targeted Playwright smoke for guest login redirect, demo login, and authenticated dashboard shell

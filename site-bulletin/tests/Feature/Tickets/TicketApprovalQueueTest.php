@@ -149,6 +149,68 @@ class TicketApprovalQueueTest extends TestCase
             ->assertDontSeeText('Inbound missed punch request');
     }
 
+    public function test_ops_manager_sees_and_decides_manager_approvals_for_any_department(): void
+    {
+        $department = Department::factory()->create(['name' => 'Outbound']);
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $department->id,
+        ]);
+        $opsManager = User::factory()->create(['role' => 'ops_manager']);
+
+        $ticket = Ticket::factory()->create([
+            'requester_id' => $employee->id,
+            'created_for_id' => $employee->id,
+            'department_id' => $department->id,
+            'template_key' => 'shift_swap_request',
+            'status' => TicketStatus::New,
+            'title' => 'Outbound shift swap request',
+        ]);
+
+        $approval = TicketApproval::create([
+            'ticket_id' => $ticket->id,
+            'step_order' => 1,
+            'step_key' => 'manager_review',
+            'approver_role' => 'manager',
+            'status' => TicketApproval::STATUS_PENDING,
+            'public_note' => 'Manager review needed for Outbound.',
+        ]);
+
+        $this->actingAs($opsManager)
+            ->get(route('tickets.approvals.index'))
+            ->assertOk()
+            ->assertSeeText('Outbound shift swap request')
+            ->assertSeeText('Manager review needed for Outbound.');
+
+        $this->actingAs($opsManager)
+            ->patch(route('tickets.approvals.update', [$ticket, $approval]), [
+                'decision' => 'approved',
+                'public_note' => 'Approved by operations.',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('ticket_approvals', [
+            'id' => $approval->id,
+            'status' => TicketApproval::STATUS_APPROVED,
+            'approver_id' => $opsManager->id,
+        ]);
+    }
+
+    public function test_manager_department_filter_cannot_target_unmanaged_department(): void
+    {
+        $managedDepartment = Department::factory()->create(['name' => 'Inbound']);
+        $otherDepartment = Department::factory()->create(['name' => 'Outbound']);
+        $manager = User::factory()->manager()->create([
+            'primary_department_id' => $managedDepartment->id,
+        ]);
+
+        $manager->departments()->attach($managedDepartment->id, ['role' => 'manager', 'is_primary' => true]);
+
+        $this->actingAs($manager)
+            ->get(route('tickets.index', ['department_id' => $otherDepartment->id]))
+            ->assertForbidden();
+    }
+
     public function test_employee_cannot_open_approval_workbench(): void
     {
         $employee = User::factory()->create(['role' => 'employee']);

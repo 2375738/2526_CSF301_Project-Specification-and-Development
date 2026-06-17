@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
 use App\Models\TicketApproval;
 use App\Models\User;
+use App\Services\RoleScopeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class TicketApprovalQueueController extends Controller
 {
+    public function __construct(protected RoleScopeService $roleScope)
+    {
+    }
+
     public function __invoke(Request $request): View
     {
         $user = $request->user();
@@ -112,11 +116,11 @@ class TicketApprovalQueueController extends Controller
     {
         $query = TicketApproval::query()->with('ticket');
 
-        if ($user->hasRole('hr', 'admin')) {
+        if ($this->roleScope->canManageAllDepartments($user)) {
             return $query;
         }
 
-        $managedDepartmentIds = $user->managedDepartments()->pluck('departments.id');
+        $managedDepartmentIds = $this->roleScope->manageableDepartmentIds($user) ?? collect();
 
         if ($managedDepartmentIds->isEmpty()) {
             return $query->whereRaw('1 = 0');
@@ -129,12 +133,6 @@ class TicketApprovalQueueController extends Controller
 
     protected function departmentOptions(User $user)
     {
-        if ($user->hasRole('hr', 'admin')) {
-            return Department::query()->orderBy('name')->pluck('name', 'id');
-        }
-
-        return $user->managedDepartments()
-            ->orderBy('departments.name')
-            ->pluck('departments.name', 'departments.id');
+        return $this->roleScope->departmentOptionsForManagement($user);
     }
 }

@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Department;
 use App\Models\RoleChangeRequest;
+use App\Services\SystemReadinessService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class GovernanceController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, SystemReadinessService $readinessService): View
     {
         $user = $request->user();
 
@@ -34,6 +35,7 @@ class GovernanceController extends Controller
         return view('governance.index', [
             'pendingApprovals' => $pendingApprovals,
             'departments' => $departments,
+            'readinessReport' => $user->hasRole('admin') ? $readinessService->report() : null,
         ]);
     }
 

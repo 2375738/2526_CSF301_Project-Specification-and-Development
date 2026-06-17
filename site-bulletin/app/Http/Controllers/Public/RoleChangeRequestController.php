@@ -9,13 +9,14 @@ use App\Models\Department;
 use App\Models\RoleChangeRequest;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\RoleScopeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RoleChangeRequestController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, RoleScopeService $roleScope): View
     {
         $user = $request->user();
 
@@ -23,7 +24,7 @@ class RoleChangeRequestController extends Controller
             ->with(['requester:id,name', 'target:id,name', 'approver:id,name', 'department:id,name'])
             ->orderByDesc('created_at');
 
-        if ($user->hasRole('hr', 'admin')) {
+        if ($roleScope->canManageAllDepartments($user)) {
             $requests = $query->paginate(10);
         } else {
             $requests = $query
@@ -38,11 +39,11 @@ class RoleChangeRequestController extends Controller
         ]);
     }
 
-    public function create(Request $request): View
+    public function create(Request $request, RoleScopeService $roleScope): View
     {
         $user = $request->user();
 
-        [$targets, $departments] = $this->optionsFor($user);
+        [$targets, $departments] = $this->optionsFor($user, $roleScope);
 
         return view('role-requests.create', [
             'targets' => $targets,
@@ -54,11 +55,14 @@ class RoleChangeRequestController extends Controller
         ]);
     }
 
-    public function store(RoleChangeRequestStoreRequest $request, AuditLogger $auditLogger): RedirectResponse
-    {
+    public function store(
+        RoleChangeRequestStoreRequest $request,
+        AuditLogger $auditLogger,
+        RoleScopeService $roleScope
+    ): RedirectResponse {
         $user = $request->user();
 
-        [$targets, $departments] = $this->optionsFor($user);
+        [$targets, $departments] = $this->optionsFor($user, $roleScope);
 
         abort_unless($targets->has($request->integer('target_user_id')), 403);
 
@@ -90,17 +94,17 @@ class RoleChangeRequestController extends Controller
             ->with('status', 'Role change request submitted for review.');
     }
 
-    protected function optionsFor(User $user): array
+    protected function optionsFor(User $user, RoleScopeService $roleScope): array
     {
-        if ($user->hasRole('hr', 'admin')) {
+        if ($roleScope->canManageAllDepartments($user)) {
             $targets = User::query()->orderBy('name')->pluck('name', 'id');
             $departments = Department::query()->orderBy('name')->pluck('name', 'id');
 
             return [$targets, $departments];
         }
 
-        if ($user->hasRole('manager', 'ops_manager')) {
-            $managedDepartments = $user->managedDepartments()->pluck('departments.id');
+        if ($user->hasRole('manager')) {
+            $managedDepartments = $roleScope->managedDepartmentIds($user);
 
             $targets = User::query()
                 ->whereIn('role', [

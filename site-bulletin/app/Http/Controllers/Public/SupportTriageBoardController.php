@@ -6,29 +6,23 @@ use App\Enums\TicketStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Ticket;
+use App\Services\OperationalPreventionService;
+use App\Services\RoleScopeService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SupportTriageBoardController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, RoleScopeService $roleScope, OperationalPreventionService $operationalPrevention): View
     {
         $user = $request->user();
 
-        $scopeDepartmentIds = $user->hasRole('hr', 'admin')
-            ? null
-            : $user->managedDepartments()->pluck('departments.id');
+        $scopeDepartmentIds = $roleScope->manageableDepartmentIds($user);
 
         $baseQuery = Ticket::query()
             ->with(['requester:id,name', 'assignee:id,name', 'category:id,name', 'department:id,name']);
 
-        if ($scopeDepartmentIds !== null) {
-            if ($scopeDepartmentIds->isEmpty()) {
-                $baseQuery->whereRaw('1 = 0');
-            } else {
-                $baseQuery->whereIn('department_id', $scopeDepartmentIds);
-            }
-        }
+        $roleScope->applyManageableDepartmentScope($baseQuery, $user);
 
         $unassignedNew = (clone $baseQuery)
             ->whereIn('status', [TicketStatus::New->value, TicketStatus::Triaged->value])
@@ -101,6 +95,8 @@ class SupportTriageBoardController extends Controller
                 'total' => (int) ($ticket->total ?? 0),
             ]);
 
+        $preventionInsights = $operationalPrevention->forUser($user);
+
         return view('tickets.triage', [
             'unassignedNew' => $unassignedNew,
             'breachedQueue' => $breachedQueue,
@@ -109,6 +105,7 @@ class SupportTriageBoardController extends Controller
             'ownershipSummary' => $ownershipSummary,
             'categorySummary' => $categorySummary,
             'departmentSummary' => $departmentSummary,
+            'preventionInsights' => $preventionInsights,
             'scopeDepartmentIds' => $scopeDepartmentIds,
             'categoryOptions' => Category::query()->orderBy('name')->pluck('name', 'id'),
         ]);

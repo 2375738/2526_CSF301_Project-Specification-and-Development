@@ -20,7 +20,7 @@ class ProfileTest extends TestCase
 
         $response->assertOk();
         $this->assertSame(1, substr_count($response->getContent(), '<header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">'));
-        $this->assertSame(1, substr_count($response->getContent(), 'Coursework prototype.'));
+        $this->assertSame(0, substr_count($response->getContent(), 'Coursework prototype.'));
     }
 
     public function test_profile_information_can_be_updated(): void

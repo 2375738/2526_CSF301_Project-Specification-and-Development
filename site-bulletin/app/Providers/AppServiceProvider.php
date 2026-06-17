@@ -11,7 +11,9 @@ use App\Policies\TicketPolicy;
 use App\Policies\ConversationPolicy;
 use App\Policies\AuditLogPolicy;
 use App\Policies\RoleChangeRequestPolicy;
+use App\Services\NavigationViewData;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -45,5 +47,9 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Models\Message::observe(\App\Observers\MessageObserver::class);
         \App\Models\Announcement::observe(\App\Observers\AnnouncementObserver::class);
+
+        View::composer('layouts.app', function ($view) {
+            $view->with(app(NavigationViewData::class)->forRequest(request()));
+        });
     }
 }

@@ -12,6 +12,7 @@ use App\Models\Department;
 use App\Models\User;
 use App\Models\TicketApproval;
 use App\Services\NotificationService;
+use App\Services\RoleScopeService;
 use App\Services\SLAService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +23,7 @@ use Illuminate\View\View;
 
 class ReportTicketController extends Controller
 {
-    public function create(Request $request): View
+    public function create(Request $request, RoleScopeService $roleScope): View
     {
         $this->authorize('create', Ticket::class);
 
@@ -31,6 +32,12 @@ class ReportTicketController extends Controller
         $templateKey = (string) $request->query('template', $request->query('preset', old('template', old('preset', ''))));
         $ticketTemplates = $this->buildTicketTemplates($categories, $user);
         $selectedTemplate = $ticketTemplates->firstWhere('key', $templateKey);
+        $guideAnswers = [
+            'area' => (string) $request->query('guide_area', ''),
+            'impact' => (string) $request->query('guide_impact', ''),
+            'blocked' => (string) $request->query('guide_blocked', ''),
+        ];
+        $guidedRecommendations = $this->guidedTemplateRecommendations($ticketTemplates, $guideAnswers);
 
         $title = old('title', $request->query('title', $selectedTemplate['title'] ?? null));
         $description = old('description', $request->query('description', $selectedTemplate['description_template'] ?? null));
@@ -51,10 +58,10 @@ class ReportTicketController extends Controller
             $departmentQuery = Department::query()->orderBy('name');
             $employeeQuery = User::query()->orderBy('name');
 
-            if ($user->hasRole('hr', 'admin', 'ops_manager')) {
+            if ($roleScope->canManageAllDepartments($user)) {
                 // no restrictions
             } else {
-                $managedIds = $user->managedDepartments()->pluck('departments.id');
+                $managedIds = $roleScope->managedDepartmentIds($user);
                 $departmentQuery->whereIn('id', $managedIds);
                 $employeeQuery->whereHas('departments', fn ($q) => $q->whereIn('departments.id', $managedIds));
             }
@@ -75,13 +82,16 @@ class ReportTicketController extends Controller
             'prefillDescription' => $description,
             'prefillLocation' => $location,
             'prefillCategoryId' => $categoryId,
+            'guideAnswers' => $guideAnswers,
+            'guidedRecommendations' => $guidedRecommendations,
         ]);
     }
 
     public function store(
         StoreTicketRequest $request,
         SLAService $slaService,
-        NotificationService $notifier
+        NotificationService $notifier,
+        RoleScopeService $roleScope
     ): RedirectResponse {
         $user = $request->user();
         $templateKey = (string) $request->input('template', $request->input('preset', ''));
@@ -99,8 +109,8 @@ class ReportTicketController extends Controller
         if ($canActOnBehalf && $request->filled('created_for_id')) {
             $createdFor = User::findOrFail($request->integer('created_for_id'));
 
-            if (! $user->hasRole('hr', 'admin', 'ops_manager')) {
-                $managedIds = $user->managedDepartments()->pluck('departments.id');
+            if (! $roleScope->canManageAllDepartments($user)) {
+                $managedIds = $roleScope->managedDepartmentIds($user);
                 abort_unless($createdFor->departments()->whereIn('departments.id', $managedIds)->exists(), 403);
             }
         } elseif (! $canActOnBehalf) {
@@ -116,9 +126,8 @@ class ReportTicketController extends Controller
         if ($request->filled('department_id')) {
             $department = Department::findOrFail($request->integer('department_id'));
 
-            if (! $user->hasRole('hr', 'admin', 'ops_manager')) {
-                $managedIds = $user->managedDepartments()->pluck('departments.id');
-                abort_unless($managedIds->contains($department->id), 403);
+            if (! $roleScope->canManageAllDepartments($user)) {
+                abort_unless($roleScope->canManageDepartment($user, $department->id), 403);
             }
 
             $departmentId = $department->id;
@@ -327,6 +336,49 @@ class ReportTicketController extends Controller
                 'approval_steps' => $template['approval_steps'],
             ];
         });
+    }
+
+    protected function guidedTemplateRecommendations(Collection $ticketTemplates, array $answers): Collection
+    {
+        if (collect($answers)->filter()->isEmpty()) {
+            return collect();
+        }
+
+        $area = $answers['area'] ?? '';
+        $impact = $answers['impact'] ?? '';
+        $blocked = $answers['blocked'] ?? '';
+
+        $weightedKeys = match ($area) {
+            'safety' => ['safety_hazard' => 100, 'department_blocker' => 35],
+            'equipment' => ['scanner_issue' => 85, 'facilities_issue' => 70, 'department_blocker' => 30],
+            'work_area' => ['facilities_issue' => 80, 'department_blocker' => 55, 'safety_hazard' => 35],
+            'travel' => ['transport_issue' => 90],
+            'time_or_shift' => ['missed_punch' => 70, 'shift_swap_request' => 70],
+            'people_or_hr' => ['missed_punch' => 50, 'shift_swap_request' => 60],
+            default => ['scanner_issue' => 30, 'facilities_issue' => 30, 'safety_hazard' => 30],
+        };
+
+        if ($impact === 'urgent') {
+            $weightedKeys['safety_hazard'] = ($weightedKeys['safety_hazard'] ?? 0) + 30;
+            $weightedKeys['department_blocker'] = ($weightedKeys['department_blocker'] ?? 0) + 25;
+        }
+
+        if ($blocked === 'yes') {
+            $weightedKeys['department_blocker'] = ($weightedKeys['department_blocker'] ?? 0) + 25;
+            $weightedKeys['scanner_issue'] = ($weightedKeys['scanner_issue'] ?? 0) + 15;
+            $weightedKeys['facilities_issue'] = ($weightedKeys['facilities_issue'] ?? 0) + 15;
+        }
+
+        return $ticketTemplates
+            ->map(function (array $template) use ($weightedKeys): array {
+                $template['guide_score'] = $weightedKeys[$template['key']] ?? 0;
+
+                return $template;
+            })
+            ->filter(fn (array $template) => $template['guide_score'] > 0)
+            ->sortByDesc('guide_score')
+            ->take(3)
+            ->values();
     }
 
     protected function buildStructuredDetails(array $template, Collection $detailAnswers): array

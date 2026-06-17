@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tickets\Tables;
 
+use App\Services\RoleScopeService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -16,12 +17,21 @@ class TicketsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query
-                ->with(['requester', 'assignee', 'category'])
-                ->leftJoin('s_l_a_settings', 's_l_a_settings.priority', '=', 'tickets.priority')
-                ->select('tickets.*')
-                ->selectRaw('DATE_ADD(tickets.created_at, INTERVAL COALESCE(s_l_a_settings.resolution_minutes, 0) MINUTE) as resolution_due_at')
-            )
+            ->modifyQueryUsing(function ($query) {
+                $query
+                    ->with(['requester', 'assignee', 'category'])
+                    ->leftJoin('s_l_a_settings', 's_l_a_settings.priority', '=', 'tickets.priority')
+                    ->select('tickets.*')
+                    ->selectRaw('DATE_ADD(tickets.created_at, INTERVAL COALESCE(s_l_a_settings.resolution_minutes, 0) MINUTE) as resolution_due_at');
+
+                $user = auth()->user();
+
+                if (! $user) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                return app(RoleScopeService::class)->applyViewableDepartmentScope($query, $user, 'tickets.department_id');
+            })
             ->columns([
                 TextColumn::make('title')
                     ->limit(40)

@@ -19,6 +19,7 @@ class TicketFiltersTest extends TestCase
         $manager = User::factory()->manager()->create([
             'primary_department_id' => $department->id,
         ]);
+        $manager->departments()->attach($department->id, ['role' => 'manager', 'is_primary' => true]);
 
         $safety = Category::factory()->create(['name' => 'Safety', 'audience' => 'all']);
         $hr = Category::factory()->create(['name' => 'HR', 'audience' => 'all']);
@@ -75,4 +76,3 @@ class TicketFiltersTest extends TestCase
             ->assertDontSeeText('Breached but out of range');
     }
 }
-

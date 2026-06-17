@@ -10,6 +10,7 @@ use App\Models\ManagerRelationship;
 use App\Models\Message;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\RoleScopeService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -79,7 +80,7 @@ class ConversationController extends Controller
             ->with('status', $lock ? 'Conversation locked.' : 'Conversation unlocked.');
     }
 
-    public function store(ConversationStoreRequest $request): RedirectResponse
+    public function store(ConversationStoreRequest $request, RoleScopeService $roleScope): RedirectResponse
     {
         $this->authorize('create', Conversation::class);
 
@@ -114,10 +115,7 @@ class ConversationController extends Controller
         } elseif ($type === 'department') {
             $department = Department::findOrFail($data['department_id'] ?? 0);
 
-            $allowed = $user->hasRole('hr', 'admin', 'ops_manager') ||
-                $user->managedDepartments()->where('departments.id', $department->id)->exists();
-
-            abort_unless($allowed, 403);
+            abort_unless($roleScope->canManageDepartment($user, $department->id), 403);
 
             $participantIds = $department->members()->pluck('users.id');
         } else {
@@ -363,10 +361,10 @@ class ConversationController extends Controller
 
         $managedDepartmentOptions = collect();
 
-        if ($user->hasRole('hr', 'admin', 'ops_manager')) {
-            $managedDepartmentOptions = Department::orderBy('name')->pluck('name', 'id');
-        } elseif ($user->isManager()) {
-            $managedDepartmentOptions = $user->managedDepartments()->orderBy('departments.name')->pluck('departments.name', 'departments.id');
+        $roleScope = app(RoleScopeService::class);
+
+        if ($user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
+            $managedDepartmentOptions = $roleScope->departmentOptionsForManagement($user);
         }
 
         $recipientOptions = User::query()

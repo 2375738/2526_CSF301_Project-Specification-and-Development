@@ -39,6 +39,55 @@
       </article>
     </section>
 
+    @if (! empty($readinessReport))
+      @php
+        $statusClasses = [
+            'ok' => 'border-emerald-200 bg-emerald-50 text-emerald-800',
+            'warning' => 'border-amber-200 bg-amber-50 text-amber-800',
+            'critical' => 'border-rose-200 bg-rose-50 text-rose-800',
+        ];
+        $summary = $readinessReport['summary'];
+      @endphp
+      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin readiness</p>
+            <h2 class="mt-1 text-lg font-semibold text-slate-900">System Health Checklist</h2>
+            <p class="mt-1 text-sm text-slate-600">Production-facing configuration, scheduler inputs, and operational data checks.</p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">OK</p>
+              <p class="mt-1 text-2xl font-semibold text-emerald-900">{{ $summary['ok'] }}</p>
+            </div>
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Warnings</p>
+              <p class="mt-1 text-2xl font-semibold text-amber-900">{{ $summary['warning'] }}</p>
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-wide text-rose-700">Critical</p>
+              <p class="mt-1 text-2xl font-semibold text-rose-900">{{ $summary['critical'] }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-3 xl:grid-cols-2">
+          @foreach ($readinessReport['checks'] as $check)
+            <article class="rounded-xl border px-4 py-3 {{ $statusClasses[$check['status']] ?? $statusClasses['warning'] }}">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-semibold">{{ $check['label'] }}</p>
+                  <p class="mt-1 text-sm">{{ $check['detail'] }}</p>
+                </div>
+                <span class="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-semibold uppercase">{{ $check['status'] }}</span>
+              </div>
+              <p class="mt-2 text-xs">{{ $check['action'] }}</p>
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endif
+
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <header class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-slate-900">Department contacts</h2>

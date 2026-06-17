@@ -20,6 +20,75 @@
       </p>
     </div>
 
+    <section class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-4">
+      <div>
+        <h2 class="text-base font-semibold text-slate-900">Not sure where this goes?</h2>
+        <p class="mt-1 text-sm text-slate-600">Answer three quick questions and the portal will suggest the closest ticket path.</p>
+      </div>
+
+      <form method="GET" action="{{ route('tickets.create') }}" class="grid gap-3 md:grid-cols-3">
+        <label class="block text-sm font-medium text-slate-700">
+          What is affected?
+          <select name="guide_area" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+            <option value="">Choose area...</option>
+            @foreach ([
+              'equipment' => 'Device or equipment',
+              'safety' => 'Safety risk',
+              'work_area' => 'Work area or facilities',
+              'travel' => 'Transport or parking',
+              'time_or_shift' => 'Time, punch, or shift',
+              'people_or_hr' => 'People or HR',
+            ] as $value => $label)
+              <option value="{{ $value }}" @selected(($guideAnswers['area'] ?? '') === $value)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </label>
+
+        <label class="block text-sm font-medium text-slate-700">
+          How urgent is it?
+          <select name="guide_impact" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+            <option value="">Choose urgency...</option>
+            <option value="urgent" @selected(($guideAnswers['impact'] ?? '') === 'urgent')>Urgent or unsafe</option>
+            <option value="soon" @selected(($guideAnswers['impact'] ?? '') === 'soon')>Needs review today</option>
+            <option value="routine" @selected(($guideAnswers['impact'] ?? '') === 'routine')>Routine request</option>
+          </select>
+        </label>
+
+        <label class="block text-sm font-medium text-slate-700">
+          Is work blocked?
+          <select name="guide_blocked" class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+            <option value="">Choose impact...</option>
+            <option value="yes" @selected(($guideAnswers['blocked'] ?? '') === 'yes')>Yes, work is blocked</option>
+            <option value="partial" @selected(($guideAnswers['blocked'] ?? '') === 'partial')>Partly blocked</option>
+            <option value="no" @selected(($guideAnswers['blocked'] ?? '') === 'no')>No, but needs logging</option>
+          </select>
+        </label>
+
+        <div class="md:col-span-3 flex flex-wrap items-center gap-3">
+          <button type="submit" class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            Recommend path
+          </button>
+          @if (($guidedRecommendations ?? collect())->isNotEmpty())
+            <a href="{{ route('tickets.create') }}" class="text-sm font-medium text-slate-600 hover:text-slate-900">Clear recommendation</a>
+          @endif
+        </div>
+      </form>
+
+      @if (($guidedRecommendations ?? collect())->isNotEmpty())
+        <div class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4">
+          <p class="text-sm font-semibold text-blue-950">Recommended ticket paths</p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-3">
+            @foreach ($guidedRecommendations as $recommendation)
+              <a href="{{ route('tickets.create', ['template' => $recommendation['key']]) }}" class="rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm transition hover:border-blue-300 hover:bg-blue-50">
+                <span class="font-semibold text-slate-900">{{ $recommendation['label'] }}</span>
+                <span class="mt-1 block text-xs text-slate-600">{{ $recommendation['description'] }}</span>
+              </a>
+            @endforeach
+          </div>
+        </div>
+      @endif
+    </section>
+
     @if (($ticketTemplates ?? collect())->isNotEmpty())
       <div class="bg-white shadow-sm rounded-xl px-6 py-5 space-y-4">
         <div>

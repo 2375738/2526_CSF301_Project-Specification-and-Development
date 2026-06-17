@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Enums\UserRole;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -74,14 +75,19 @@ class AuthenticatedSessionController extends Controller
         abort_unless($this->demoLoginEnabled(), 403);
 
         $validated = $request->validate([
-            'role' => ['required', Rule::in(['employee', 'manager'])],
+            'role' => ['required', Rule::in($this->demoRoleValues())],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
         ]);
+
+        $departmentScoped = in_array($validated['role'], [
+            UserRole::Employee->value,
+            UserRole::Manager->value,
+        ], true);
 
         $user = User::query()
             ->where('role', $validated['role'])
             ->when(
-                $validated['department_id'] ?? null,
+                $departmentScoped ? ($validated['department_id'] ?? null) : null,
                 function ($query, $departmentId) {
                     $query->where(function ($inner) use ($departmentId) {
                         $inner->where('primary_department_id', $departmentId)
@@ -123,22 +129,46 @@ class AuthenticatedSessionController extends Controller
 
     protected function demoLoginEnabled(): bool
     {
+        $configured = config('site_bulletin.demo_login_enabled');
+
+        if ($configured !== null) {
+            return filter_var($configured, FILTER_VALIDATE_BOOLEAN);
+        }
+
         return app()->environment(['local', 'testing']) || (bool) config('app.debug');
+    }
+
+    protected function demoRoles(): array
+    {
+        return [
+            UserRole::Employee->value => 'Employee',
+            UserRole::Manager->value => 'Manager',
+            UserRole::OpsManager->value => 'Ops Manager',
+            UserRole::Hr->value => 'HR',
+            UserRole::Admin->value => 'Admin',
+        ];
+    }
+
+    protected function demoRoleValues(): array
+    {
+        return array_keys($this->demoRoles());
     }
 
     protected function buildDemoPresets(Collection $departments): Collection
     {
         $departmentIds = $departments->pluck('id')->filter()->values();
 
-        return collect([
-            'employee' => 'Employee',
-            'manager' => 'Manager',
-        ])->map(function (string $label, string $role) use ($departmentIds) {
+        return collect($this->demoRoles())->map(function (string $label, string $role) use ($departmentIds) {
+            $departmentScoped = in_array($role, [
+                UserRole::Employee->value,
+                UserRole::Manager->value,
+            ], true);
+
             $user = User::query()
                 ->with('primaryDepartment:id,name')
                 ->where('role', $role)
                 ->when(
-                    $departmentIds->isNotEmpty(),
+                    $departmentScoped && $departmentIds->isNotEmpty(),
                     fn ($query) => $query->whereIn('primary_department_id', $departmentIds)
                 )
                 ->orderBy('id')

@@ -32,6 +32,30 @@ class FastIssueReportingTest extends TestCase
             ->assertDontSeeText('Department blocker');
     }
 
+    public function test_guided_reporting_recommends_matching_ticket_paths(): void
+    {
+        $employee = User::factory()->create(['role' => 'employee']);
+
+        Category::factory()->create(['name' => 'IT Support', 'audience' => 'all']);
+        Category::factory()->create(['name' => 'Safety', 'audience' => 'all']);
+        Category::factory()->create(['name' => 'Facilities', 'audience' => 'all']);
+        Category::factory()->create(['name' => 'Transport', 'audience' => 'all']);
+        Category::factory()->create(['name' => 'HR', 'audience' => 'all']);
+        Category::factory()->create(['name' => 'Operations', 'audience' => 'all']);
+
+        $this->actingAs($employee)
+            ->get(route('tickets.create', [
+                'guide_area' => 'equipment',
+                'guide_impact' => 'soon',
+                'guide_blocked' => 'yes',
+            ]))
+            ->assertOk()
+            ->assertSeeText('Recommended ticket paths')
+            ->assertSeeText('Scanner issue')
+            ->assertSeeText('Facilities issue')
+            ->assertSee(route('tickets.create', ['template' => 'scanner_issue']), false);
+    }
+
     public function test_scanner_template_prefills_ticket_form(): void
     {
         $employee = User::factory()->create(['role' => 'employee']);

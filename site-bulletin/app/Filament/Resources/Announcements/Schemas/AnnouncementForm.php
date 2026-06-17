@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\Announcements\Schemas;
 
-use App\Models\Department;
+use App\Services\RoleScopeService;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
@@ -17,6 +17,7 @@ class AnnouncementForm
     public static function configure(Schema $schema): Schema
     {
         $user = auth()->user();
+        $roleScope = app(RoleScopeService::class);
 
         $audienceOptions = [
             'all' => 'Entire site',
@@ -24,18 +25,13 @@ class AnnouncementForm
             'managers' => 'Managers only',
         ];
 
-        if ($user && ! ($user->isHr() || $user->isAdmin())) {
+        if ($user && ! $roleScope->canManageAllDepartments($user)) {
             $audienceOptions = ['department' => 'Department members'];
         }
 
-        $departmentOptions = Department::query()
-            ->when(
-                $user && ! ($user->isHr() || $user->isAdmin()),
-                fn ($query) => $query->whereIn('id', $user->departmentIds())
-            )
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->toArray();
+        $departmentOptions = $user
+            ? $roleScope->departmentOptionsForManagement($user)->toArray()
+            : [];
 
         return $schema
             ->components([

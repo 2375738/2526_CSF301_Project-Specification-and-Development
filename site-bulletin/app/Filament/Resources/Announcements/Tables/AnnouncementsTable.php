@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Announcements\Tables;
 
+use App\Services\RoleScopeService;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -14,6 +15,31 @@ class AnnouncementsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function ($query) {
+                $user = auth()->user();
+
+                if (! $user) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                if (app(RoleScopeService::class)->canViewAllDepartments($user)) {
+                    return $query;
+                }
+
+                $departmentIds = app(RoleScopeService::class)->viewableDepartmentIds($user) ?? collect();
+
+                return $query->where(function ($inner) use ($departmentIds) {
+                    $inner->where('author_id', auth()->id());
+
+                    if ($departmentIds->isNotEmpty()) {
+                        $inner->orWhere(function ($departmentQuery) use ($departmentIds) {
+                            $departmentQuery
+                                ->where('audience', 'department')
+                                ->whereIn('department_id', $departmentIds);
+                        });
+                    }
+                });
+            })
             ->columns([
                 TextColumn::make('title')
                     ->searchable(),

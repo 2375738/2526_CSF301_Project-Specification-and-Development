@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\RoleScopeService;
 
 class TicketPolicy
 {
@@ -23,8 +24,8 @@ class TicketPolicy
 
     public function view(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager() || $user->isHr()) {
-            return ! $ticket->isPrivateTo($user);
+        if ($this->canActOnTicket($user, $ticket)) {
+            return true;
         }
 
         if (
@@ -45,17 +46,13 @@ class TicketPolicy
 
     public function update(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager() || $user->isHr()) {
-            return ! $ticket->isPrivateTo($user);
-        }
-
-        return false;
+        return $this->canActOnTicket($user, $ticket);
     }
 
     public function comment(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager() || $user->isHr()) {
-            return ! $ticket->isPrivateTo($user);
+        if ($this->canActOnTicket($user, $ticket)) {
+            return true;
         }
 
         return $ticket->requester_id === $user->id || $ticket->created_for_id === $user->id;
@@ -68,10 +65,23 @@ class TicketPolicy
 
     public function close(User $user, Ticket $ticket): bool
     {
-        if ($user->isManager() || $user->isHr()) {
+        if ($this->canActOnTicket($user, $ticket)) {
             return true;
         }
 
         return $ticket->requester_id === $user->id || $ticket->created_for_id === $user->id;
+    }
+
+    protected function canActOnTicket(User $user, Ticket $ticket): bool
+    {
+        if (! $user->hasRole('manager', 'ops_manager', 'hr', 'admin')) {
+            return false;
+        }
+
+        if ($ticket->isPrivateTo($user)) {
+            return false;
+        }
+
+        return app(RoleScopeService::class)->canViewDepartment($user, $ticket->department_id);
     }
 }

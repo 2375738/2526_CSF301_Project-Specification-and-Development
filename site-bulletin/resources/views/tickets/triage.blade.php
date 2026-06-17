@@ -50,6 +50,55 @@
       </div>
     </section>
 
+    @php
+      $preventionInsights = $preventionInsights ?? null;
+      $repeatClusters = collect($preventionInsights['repeat_clusters'] ?? []);
+      $pressure = $preventionInsights['pressure'] ?? null;
+    @endphp
+
+    @if ($preventionInsights && $pressure)
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $preventionInsights['scope_label'] }} · {{ $preventionInsights['window_days'] }} days</p>
+            <h2 class="mt-1 text-lg font-semibold text-slate-900">Prevention Pressure</h2>
+            <p class="mt-1 text-sm text-slate-600">Use repeat clusters and aging pressure to decide what needs assignment, transfer, or escalation first.</p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-3">
+            <a href="{{ route('tickets.index', ['breached' => 1]) }}" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 transition hover:border-rose-300">
+              <p class="text-xs font-semibold uppercase tracking-wide text-rose-700">Breached</p>
+              <p class="mt-1 text-2xl font-semibold text-rose-900">{{ $pressure['breached_count'] }}</p>
+            </a>
+            <a href="{{ route('tickets.index') }}" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 transition hover:border-amber-300">
+              <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Aging 48h+</p>
+              <p class="mt-1 text-2xl font-semibold text-amber-900">{{ $pressure['aging_count'] }}</p>
+            </a>
+            <a href="{{ route('tickets.index', ['status' => 'new']) }}" class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 transition hover:border-blue-300">
+              <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Unassigned</p>
+              <p class="mt-1 text-2xl font-semibold text-blue-900">{{ $pressure['unassigned_count'] }}</p>
+            </a>
+          </div>
+        </div>
+
+        <div class="grid gap-3 xl:grid-cols-2">
+          @forelse ($repeatClusters as $cluster)
+            <a href="{{ route('tickets.index', $cluster['query']) }}" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-blue-300 hover:bg-blue-50">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-semibold text-slate-900">{{ $cluster['category_name'] }} · {{ $cluster['template_label'] }}</p>
+                  <p class="mt-1 text-xs text-slate-500">{{ $cluster['department_name'] }} · {{ $cluster['location'] }}</p>
+                </div>
+                <span class="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">{{ $cluster['total'] }} repeats</span>
+              </div>
+              <p class="mt-2 text-xs text-slate-500">{{ $cluster['open_count'] }} open · {{ $cluster['breached_count'] }} breached · latest {{ $cluster['latest_human'] }}</p>
+            </a>
+          @empty
+            <p class="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">No repeated issue clusters in the current triage scope.</p>
+          @endforelse
+        </div>
+      </section>
+    @endif
+
     <div class="grid gap-6 xl:grid-cols-2">
       <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between">

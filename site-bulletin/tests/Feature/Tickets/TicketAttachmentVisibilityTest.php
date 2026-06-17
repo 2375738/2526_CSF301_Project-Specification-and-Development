@@ -28,6 +28,7 @@ class TicketAttachmentVisibilityTest extends TestCase
             'role' => 'employee',
             'primary_department_id' => $department->id,
         ]);
+        $manager->departments()->attach($department->id, ['role' => 'manager', 'is_primary' => true]);
 
         $ticket = Ticket::factory()->create([
             'requester_id' => $employee->id,

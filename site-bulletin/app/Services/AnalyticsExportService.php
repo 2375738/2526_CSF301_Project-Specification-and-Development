@@ -3,20 +3,30 @@
 namespace App\Services;
 
 use App\Models\Ticket;
+use App\Models\User;
 use Illuminate\Support\Collection;
 
 class AnalyticsExportService
 {
-    public function __construct(protected SLAService $slaService)
+    public function __construct(
+        protected SLAService $slaService,
+        protected RoleScopeService $roleScope
+    )
     {
     }
 
     /**
      * @return array{headers: array<int,string>, rows: \Illuminate\Support\Collection<int,array<int,string>>}
      */
-    public function generateTicketExport(): array
+    public function generateTicketExport(?User $user = null): array
     {
-        $tickets = Ticket::with(['category', 'assignee', 'requester'])->orderByDesc('created_at')->get();
+        $query = Ticket::with(['category', 'assignee', 'requester'])->orderByDesc('created_at');
+
+        if ($user) {
+            $this->roleScope->applyViewableDepartmentScope($query, $user);
+        }
+
+        $tickets = $query->get();
 
         $headers = [
             'Ticket ID',

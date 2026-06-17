@@ -69,4 +69,27 @@ class RoleChangeRequestTest extends TestCase
             'target_user_id' => $externalEmployee->id,
         ]);
     }
+
+    public function test_ops_manager_can_submit_for_any_department_employee(): void
+    {
+        $department = Department::factory()->create();
+        $opsManager = User::factory()->create(['role' => UserRole::OpsManager]);
+        $employee = User::factory()->create(['primary_department_id' => $department->id]);
+        $employee->departments()->attach($department->id, ['role' => 'member']);
+
+        $this->actingAs($opsManager)
+            ->post(route('role-requests.store'), [
+                'target_user_id' => $employee->id,
+                'requested_role' => UserRole::Manager->value,
+                'department_id' => $department->id,
+                'justification' => 'Site-wide leadership coverage.',
+            ])
+            ->assertRedirect(route('role-requests.index'));
+
+        $this->assertDatabaseHas('role_change_requests', [
+            'requester_id' => $opsManager->id,
+            'target_user_id' => $employee->id,
+            'department_id' => $department->id,
+        ]);
+    }
 }

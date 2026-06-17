@@ -8,88 +8,6 @@
   @vite(['resources/css/app.css','resources/js/app.js'])
 </head>
 <body class="cwl1-bg cwl1-noise overflow-x-hidden text-gray-900">
-  @php
-    $showGovernance = auth()->check() && auth()->user()->hasRole('manager', 'ops_manager', 'hr', 'admin');
-    $user = auth()->user();
-    $unreadAnnouncementCount = 0;
-    $unreadConversationCount = 0;
-
-    if ($user) {
-      $unreadAnnouncementCount = \App\Models\Announcement::query()
-        ->active()
-        ->visibleTo($user)
-        ->whereDoesntHave('readers', fn ($query) => $query->where('users.id', $user->id))
-        ->count();
-
-      $unreadConversationCount = \App\Models\Conversation::query()
-        ->forUser($user)
-        ->whereHas('participants', function ($query) use ($user) {
-          $query->where('users.id', $user->id)
-            ->where(function ($sub) {
-              $sub->whereNull('conversation_participants.last_read_at')
-                ->orWhereColumn('conversation_participants.last_read_at', '<', 'conversations.updated_at');
-            });
-        })
-        ->count();
-    }
-
-    $desktopNavItems = [
-      ['label' => 'Dashboard', 'route' => route('home'), 'active' => request()->routeIs('home', 'dashboard'), 'icon' => 'dashboard', 'badge' => 0],
-    ];
-
-    if ($user?->isEmployee()) {
-      $desktopNavItems[] = ['label' => 'My Work', 'route' => route('my-work.index'), 'active' => request()->routeIs('my-work.*'), 'icon' => 'my-work', 'badge' => 0];
-    }
-
-    $desktopNavItems = array_merge($desktopNavItems, [
-      ['label' => 'Messages', 'route' => route('messages.index'), 'active' => request()->routeIs('messages.*'), 'icon' => 'messages', 'badge' => $unreadConversationCount],
-      ['label' => 'Knowledge', 'route' => route('knowledge.index'), 'active' => request()->routeIs('knowledge.*'), 'icon' => 'knowledge', 'badge' => 0],
-      ['label' => 'Tickets', 'route' => route('tickets.index'), 'active' => request()->routeIs('tickets.*'), 'icon' => 'tasks', 'badge' => 0],
-      ['label' => 'Profile', 'route' => route('profile.edit'), 'active' => request()->routeIs('profile.*'), 'icon' => 'profile', 'badge' => 0],
-    ]);
-
-    if ($showGovernance) {
-      $desktopNavItems[] = ['label' => 'Analytics', 'route' => route('analytics.index'), 'active' => request()->routeIs('analytics.*'), 'icon' => 'analytics', 'badge' => 0];
-    }
-
-    if ($showGovernance) {
-      $desktopNavItems[] = ['label' => 'Governance', 'route' => route('governance.index'), 'active' => request()->routeIs('governance.*'), 'icon' => 'governance', 'badge' => 0];
-    }
-
-    if ($user?->isEmployee()) {
-      $mobileNavItems = [
-        $desktopNavItems[0],
-        $desktopNavItems[1],
-        $desktopNavItems[2],
-        $desktopNavItems[4],
-        $desktopNavItems[5],
-      ];
-    } else {
-      $mobileNavItems = [
-        $desktopNavItems[0],
-        $desktopNavItems[1],
-        $desktopNavItems[3],
-        $desktopNavItems[5] ?? $desktopNavItems[4],
-      ];
-
-      if ($showGovernance) {
-        $mobileNavItems[] = ['label' => 'More', 'route' => route('governance.index'), 'active' => request()->routeIs('governance.*', 'analytics.*'), 'icon' => 'governance', 'badge' => 0];
-      } else {
-        $mobileNavItems[] = $desktopNavItems[2];
-      }
-    }
-
-    $userInitials = $user
-      ? collect(explode(' ', trim($user->name)))
-          ->filter()
-          ->take(2)
-          ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
-          ->implode('')
-      : '';
-
-    $userRoleLabel = $user?->role?->label()
-      ?? ($user?->role ? str($user->role)->replace('_', ' ')->title()->toString() : null);
-  @endphp
   <div
     class="min-h-screen lg:flex"
     x-data="{
@@ -279,7 +197,7 @@
       </main>
 
       <footer class="border-t border-slate-200 bg-white/90 py-4 text-center text-xs text-slate-500 backdrop-blur">
-        &copy; {{ now()->year }} Site Bulletin. Coursework prototype.
+        &copy; {{ now()->year }} Site Bulletin.@if ($showPrototypeFooter ?? false) Coursework prototype.@endif
       </footer>
     </div>
   </div>

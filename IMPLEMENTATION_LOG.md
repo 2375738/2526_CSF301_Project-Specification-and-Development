@@ -2165,12 +2165,157 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
 - Validation:
   - `php artisan test tests/Feature/Tickets/TicketIndexViewTest.php`
   - `npm run build`
+
+## 2026-05-05 - Navigation, demo boundary, and dashboard component cleanup
+- Scope: `site-bulletin/resources/views/layouts/app.blade.php`, `site-bulletin/resources/views/dashboard/partials/content.blade.php`, `site-bulletin/resources/views/components/category-icon.blade.php`, navigation/dashboard services, browser smoke tests.
+- Reason: the app needed production-facing demo/prototype boundaries, less query logic inside Blade layouts, more robust mobile navigation construction, and reusable quick-link icon rendering.
+- Change:
+  - moved shell navigation counts and nav item construction into a dedicated view-data service
+  - made mobile navigation derive from named items instead of fragile desktop array indexes
+  - hid the coursework prototype footer label behind explicit configuration
+  - moved dashboard quick-link SVG selection into a reusable Blade component
+  - updated browser smoke expectations from legacy `Tasks`/`Announcements` shell labels to current `Tickets`/`Knowledge` navigation
+- Validation:
+  - `php artisan test`
+  - `npm run build`
+
+## 2026-05-06 - RS-02 role scope foundation
+- Scope: shared role/department scoping, support triage board, on-behalf ticket creation, role change requests, department broadcasts, audit-log visibility, announcement authoring, ticket approvals, ticket filters, analytics saved views/export, dashboard governance/attention data, manager-accessible Filament ticket/content department surfaces, and role-scenario strategy decisions.
+- Reason: the role-scenario plan needs a single source of truth for department visibility before adding role-specific action dashboards and workspaces.
+- Change:
+  - added `RoleScopeService` for view/manage department scope decisions
+  - encoded the accepted consensus that `ops_manager` is a site-wide command-center role
+  - migrated selected high-risk consumers to the shared service
+  - moved announcement audience options, approval workbench scoping, ticket department filtering, analytics department selection, and dashboard governance/role-request widgets onto the shared scope path
+  - closed the remaining policy/export/admin-resource sweep by scoping public ticket authorization, analytics CSV export, and manager-accessible Filament ticket/content department controls
+  - added scope characterization tests for employee, manager, ops manager, HR, and admin behavior
+  - added regression coverage for ops-manager site-wide announcement and manager-approval behavior, manager analytics restrictions/export scoping, unmanaged ticket filter rejection, and ticket policy boundaries
+  - updated the implementation strategy with accepted consensus decisions and marked RS-02 complete
+- Validation:
+  - `php artisan test tests/Feature/Announcements/AnnouncementCreationPermissionsTest.php tests/Feature/Tickets/TicketApprovalQueueTest.php tests/Feature/Analytics/SavedAnalyticsViewTest.php tests/Feature/DashboardTrendPanelsTest.php`
+  - `php artisan test tests/Feature/TicketPermissionsTest.php tests/Feature/Analytics/AnalyticsDashboardTest.php tests/Feature/Analytics/AnalyticsDigestCommandTest.php tests/Feature/Announcements/AnnouncementCreationPermissionsTest.php tests/Feature/Tickets/TicketFiltersTest.php`
+  - `php artisan test tests/Feature/Tickets tests/Feature/Governance tests/Feature/Announcements tests/Feature/Messaging tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test tests/Feature/Tickets tests/Feature/Analytics tests/Feature/Announcements tests/Feature/Governance tests/Feature/Messaging tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+  - `php artisan test`
+
+## 2026-05-06 - RS-01 action-led role home screens
+- Scope: dashboard role worklists, shared next-action service, and role-specific dashboard tests.
+- Reason: employees, managers, ops managers, HR, and admins need a concise "what needs my attention now" surface instead of reading separate dashboard widgets to infer priorities.
+- Change:
+  - added `RoleActionService` to build capped role-specific action lists
+  - added a dashboard `Next Actions` section with direct links and role-specific empty state
+  - surfaced employee ticket/update actions, manager department actions, ops site pressure, HR approvals/sensitive cases/role requests, and admin configuration health
+  - added feature tests proving the dashboard action section renders correct work for employee, manager, ops manager, HR, and admin
+- Validation:
+  - `php artisan test tests/Feature/DashboardRoleActionsTest.php tests/Feature/DashboardTrendPanelsTest.php tests/Feature/LayoutNavigationTest.php`
+  - `npm run build`
+  - `php artisan test`
+
+## 2026-05-06 - RS-03 employee ticket self-service tabs
+- Scope: employee ticket index controller filters, ticket index Blade UI, and ticket index feature tests.
+- Reason: employees need a clearer way to track reported issues by what needs their action versus what is waiting on the team.
+- Change:
+  - added employee-only ticket flow tabs for `Needs me`, `In progress`, `Waiting on team`, and `Resolved`
+  - added queue filtering that preserves existing search/type filters and does not affect manager ticket filters
+  - added feature tests for tab rendering, `Needs me` filtering, and manager exclusion
+  - updated the strategy ledger to mark RS-03 as in progress
+- Validation:
+  - `php artisan test tests/Feature/Tickets/TicketIndexViewTest.php tests/Feature/Tickets/TicketFiltersTest.php tests/Feature/Tickets/TicketLifecycleTransparencyTest.php`
+  - `npm run build`
+  - `php artisan test`
+
+## 2026-05-06 - RS-03 guided reporting and unified help search
+- Scope: ticket report guidance, knowledge search controller/view, quick-link and announcement search grouping, and related feature tests.
+- Reason: employees need a lower-friction path when they do not know the right ticket category, and help search should find operational answers across snippets, quick links, and announcements.
+- Change:
+  - added a three-question guided report recommender that suggests existing ticket templates
+  - grouped knowledge search results into snippets, quick links, announcements, and a guided-report fallback
+  - kept quick-link results behind existing category visibility rules
+  - added feature tests for guided recommendations, grouped help results, and hidden manager-only links
+  - updated the strategy ledger to mark RS-03 complete
+- Validation:
+  - `php artisan test tests/Feature/Tickets/FastIssueReportingTest.php tests/Feature/KnowledgeSnippetSearchTest.php`
+  - `npm run build`
+  - `php artisan test`
+
+## 2026-05-06 - RS-04 repeat issue and breach prevention
+- Scope: manager/ops dashboard prevention surface, support triage prevention panel, repeat issue clustering service, ticket repeat filters, and dashboard/triage feature tests.
+- Reason: managers and ops managers need to spot recurring blockers, aging tickets, and breach pressure before they become broader shift problems.
+- Change:
+  - added `OperationalPreventionService` for scoped repeat clusters and breach/aging pressure
+  - added dashboard `Prevention Watch` for managers and ops managers, including site-wide ops pressure
+  - added triage `Prevention Pressure` with repeat cluster links for faster intervention
+  - added exact `template_key` and `location` ticket filters so repeat-cluster links open the relevant queue
+  - added regression tests for manager scoping, ops site-wide prevention, and triage repeat pressure
+- Validation:
+  - `php artisan test tests/Feature/DashboardTrendPanelsTest.php tests/Feature/Tickets/TriageBoardTest.php`
+  - `npm run build`
+  - `php artisan test`
+  - `git diff --check` (line-ending warnings only)
+
+## 2026-05-06 - RS-05 HR-specific workspace
+- Scope: HR dashboard workspace, shared HR queue service, sensitive ticket detail guidance, and HR dashboard regression tests.
+- Reason: HR needed a daily work surface distinct from manager and operations dashboards, with privacy-sensitive people work grouped separately from generic ticket queues.
+- Change:
+  - added `HrWorkspaceService` for HR approvals, sensitive cases, people tickets, role requests, and policy acknowledgement exceptions
+  - added dashboard `People Operations Queue` visible to HR users only
+  - linked each HR queue back to existing approval, ticket, governance, and announcement workbench routes
+  - added a sensitive-case handling banner on ticket detail to separate requester-facing updates from private HR notes
+  - added feature tests for HR workspace visibility and sensitive ticket guidance
+- Validation:
+  - `php artisan test tests/Feature/DashboardHrWorkspaceTest.php tests/Feature/DashboardRoleActionsTest.php tests/Feature/Tickets/TicketApprovalQueueTest.php tests/Feature/Tickets/TicketAttachmentVisibilityTest.php tests/Feature/Announcements/AnnouncementReadFlowTest.php`
+  - `npm run build`
+  - `php artisan test`
+  - `git diff --check` (line-ending warnings only)
+
+## 2026-05-06 - RS-06 admin readiness and system health
+- Scope: admin governance readiness panel, shared readiness service, readiness Artisan command, and governance feature tests.
+- Reason: admins need a production/demo readiness checklist without reading `.env`, queue config, scheduler assumptions, or operational data tables directly.
+- Change:
+  - added `SystemReadinessService` for debug mode, demo boundary, prototype footer, queue, mailer, failed jobs, storage link, writable storage, missing departments, missing manager relationships, metrics freshness, and demo sample freshness
+  - added `site:readiness-check` with optional `--fail-on-warning`
+  - added an admin-only `System Health Checklist` section on the governance hub
+  - kept the checklist hidden from manager governance users
+  - added feature coverage for admin readiness visibility, manager exclusion, and command output
+- Validation:
+  - `php artisan test tests/Feature/Governance/GovernancePageTest.php tests/Feature/DashboardRoleActionsTest.php`
+  - `npm run build`
+  - `php artisan test`
+  - `git diff --check` (line-ending warnings only)
+
+## 2026-05-06 - Manager Filament panel login fix
+- Scope: Filament admin panel access authorization and auth regression tests.
+- Reason: managers could authenticate through Laravel but receive a Filament `403` on the admin panel in non-local environments because the user model did not explicitly implement Filament panel access.
+- Change:
+  - implemented `FilamentUser::canAccessPanel()` on `User`
+  - limited admin panel access to seeded manager/admin roles in the same shape as the existing panel role middleware
+  - added tests for manager credential login and manager access to manager-only/admin-panel pages
+- Validation:
+  - `php artisan test tests/Feature/Auth/AuthenticationTest.php tests/Feature/Auth/DemoLoginTest.php`
+  - `php artisan test tests/Feature/Analytics/SavedAnalyticsViewTest.php tests/Feature/Announcements/AnnouncementCreationPermissionsTest.php tests/Feature/Tickets/TriageBoardTest.php`
+
+## 2026-05-06 - Demo login role coverage fix
+- Scope: login demo presets, demo-login route handling, seeded demo accounts, README credentials, and auth regression tests.
+- Reason: the completed role strategy now treats employee, manager, ops manager, HR, and admin as first-class role workflows, but quick demo login only exposed employee/manager and the local database had no ops-manager demo account.
+- Change:
+  - expanded quick demo access and the custom demo role selector to employee, manager, ops manager, HR, and admin
+  - allowed demo login for all five role values while keeping department filtering scoped to employee/manager demos
+  - added a friendly GET redirect for `/demo-login` so direct navigation no longer lands on an empty method/CSRF dead end
+  - added `ops@example.com` / `password` as the seeded ops-manager account and updated the local SQLite database without a reset
+  - updated auth tests and README demo credentials
+- Validation:
+  - `php artisan migrate:status`
+  - `php artisan test tests/Feature/Auth/AuthenticationTest.php tests/Feature/Auth/DemoLoginTest.php`
+  - `php artisan test tests/Feature/DashboardRoleActionsTest.php tests/Feature/DashboardHrWorkspaceTest.php tests/Feature/Governance/GovernancePageTest.php tests/Feature/LayoutNavigationTest.php`
+
 ## 2026-06-17 - Authenticated home routing fix
 - Scope: public home route and dashboard routing regression tests.
 - Reason: the application root was rendering the dashboard controller without auth middleware, which made the start URL behave differently from `/dashboard` and could leave users thinking login routing was broken.
 - Change:
-  - made `/` an authenticated entry route that redirects signed-in users to `/dashboard`
+  - made `/` an authenticated dashboard route for signed-in users
   - allowed guests hitting `/` to flow through Laravel's auth redirect to `/login`
   - replaced the stale public-dashboard placeholder test with explicit guest and authenticated routing assertions
 - Validation:
-  - `php artisan test tests/Feature/PublicDashboardTest.php tests/Feature/PublicDashboardNewsWidgetTest.php tests/Feature/Auth/AuthenticationTest.php tests/Feature/Auth/DemoLoginTest.php`
+  - `php artisan test`
+  - `npm run build`
+  - targeted Playwright smoke for guest login redirect, demo login, and authenticated dashboard shell

@@ -88,5 +88,25 @@ class AnnouncementCreationPermissionsTest extends TestCase
             'author_id' => $hr->id,
         ]);
     }
-}
 
+    public function test_ops_manager_can_create_site_wide_announcement(): void
+    {
+        $opsManager = User::factory()->create(['role' => 'ops_manager']);
+
+        $this->actingAs($opsManager)
+            ->post(route('announcements.store'), [
+                'title' => 'Operations Site-wide Update',
+                'body' => 'Dock traffic pattern changes apply to every team.',
+                'priority' => 'high',
+                'audience' => 'all',
+            ])
+            ->assertRedirect(route('announcements.index'));
+
+        $this->assertDatabaseHas('announcements', [
+            'title' => 'Operations Site-wide Update',
+            'audience' => 'all',
+            'priority' => 'high',
+            'author_id' => $opsManager->id,
+        ]);
+    }
+}

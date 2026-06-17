@@ -17,12 +17,12 @@ class PublicDashboardTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
-    public function test_authenticated_home_redirects_to_dashboard(): void
+    public function test_authenticated_home_renders_dashboard(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get('/')
-            ->assertRedirect(route('dashboard'));
+            ->assertOk();
     }
 }

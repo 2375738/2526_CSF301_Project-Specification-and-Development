@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\RoleScopeService;
 
 class AuditLogPolicy
 {
@@ -14,17 +15,17 @@ class AuditLogPolicy
 
     public function view(User $user, AuditLog $auditLog): bool
     {
-        if ($user->hasRole('hr', 'admin')) {
+        $roleScope = app(RoleScopeService::class);
+
+        if ($roleScope->canManageAllDepartments($user)) {
             return true;
         }
 
-        if ($user->hasRole('manager', 'ops_manager')) {
+        if ($user->hasRole('manager')) {
             $auditable = $auditLog->auditable;
 
             if ($auditable instanceof \App\Models\Ticket) {
-                return $user->managedDepartments()
-                    ->where('departments.id', $auditable->department_id)
-                    ->exists();
+                return $roleScope->canManageDepartment($user, $auditable->department_id);
             }
 
             if ($auditable instanceof \App\Models\Conversation) {

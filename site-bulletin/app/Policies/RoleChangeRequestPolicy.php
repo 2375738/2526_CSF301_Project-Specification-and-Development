@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\RoleChangeRequest;
 use App\Models\User;
+use App\Services\RoleScopeService;
 
 class RoleChangeRequestPolicy
 {
@@ -14,7 +15,7 @@ class RoleChangeRequestPolicy
 
     public function view(User $user, RoleChangeRequest $request): bool
     {
-        if ($user->hasRole('hr', 'admin')) {
+        if (app(RoleScopeService::class)->canManageAllDepartments($user)) {
             return true;
         }
 
@@ -28,6 +29,6 @@ class RoleChangeRequestPolicy
 
     public function approve(User $user, RoleChangeRequest $request): bool
     {
-        return $user->hasRole('hr', 'admin');
+        return app(RoleScopeService::class)->canManageAllDepartments($user);
     }
 }

@@ -76,7 +76,7 @@ class TriageBoardTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_ops_manager_without_managed_departments_does_not_see_global_ticket_queue(): void
+    public function test_ops_manager_without_managed_departments_sees_site_wide_ticket_queue(): void
     {
         $department = Department::factory()->create(['name' => 'Inbound']);
         $category = Category::factory()->create([
@@ -100,8 +100,43 @@ class TriageBoardTest extends TestCase
         $this->actingAs($opsManager)
             ->get(route('tickets.triage'))
             ->assertOk()
-            ->assertDontSeeText('Inbound dock blocker')
-            ->assertSeeText('No unassigned new tickets in the current triage scope.')
-            ->assertSeeText('No breached tickets in the current triage scope.');
+            ->assertSeeText('Inbound dock blocker');
+    }
+
+    public function test_triage_board_surfaces_repeat_clusters_and_pressure_links(): void
+    {
+        $department = Department::factory()->create(['name' => 'Inbound']);
+        $category = Category::factory()->create([
+            'name' => 'Scanner Support',
+            'audience' => 'all',
+        ]);
+        $opsManager = User::factory()->create(['role' => 'ops_manager']);
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $department->id,
+        ]);
+
+        Ticket::factory()->count(2)->create([
+            'requester_id' => $employee->id,
+            'department_id' => $department->id,
+            'category_id' => $category->id,
+            'template_key' => 'scanner_issue',
+            'location' => 'Dock 4',
+            'status' => 'in_progress',
+            'sla_first_response_breached' => true,
+            'title' => 'Scanner pairing failure',
+            'created_at' => now()->subHours(50),
+            'updated_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($opsManager)
+            ->get(route('tickets.triage'))
+            ->assertOk()
+            ->assertSeeText('Prevention Pressure')
+            ->assertSeeText('Scanner Support · Scanner issue')
+            ->assertSeeText('Dock 4')
+            ->assertSeeText('2 repeats')
+            ->assertSee('breached=1', false)
+            ->assertSee('template_key=scanner_issue', false);
     }
 }

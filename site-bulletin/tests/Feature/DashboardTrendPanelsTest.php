@@ -218,6 +218,104 @@ class DashboardTrendPanelsTest extends TestCase
             ->assertSeeText('Benchmark Comparison');
     }
 
+    public function test_manager_prevention_watch_is_limited_to_managed_departments(): void
+    {
+        $managedDepartment = Department::factory()->create(['name' => 'Inbound']);
+        $otherDepartment = Department::factory()->create(['name' => 'Outbound']);
+        $manager = User::factory()->manager()->create([
+            'primary_department_id' => $managedDepartment->id,
+        ]);
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $managedDepartment->id,
+        ]);
+        $otherEmployee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $otherDepartment->id,
+        ]);
+        $category = Category::factory()->create(['name' => 'Scanner Support']);
+
+        $manager->departments()->attach($managedDepartment->id, ['role' => 'manager', 'is_primary' => true]);
+
+        DepartmentMetric::factory()->create([
+            'department_id' => $managedDepartment->id,
+            'metric_date' => now()->toDateString(),
+        ]);
+
+        Ticket::factory()->count(2)->create([
+            'requester_id' => $employee->id,
+            'department_id' => $managedDepartment->id,
+            'category_id' => $category->id,
+            'template_key' => 'scanner_issue',
+            'location' => 'Dock 4',
+            'status' => 'in_progress',
+            'title' => 'Managed scanner blocker',
+            'created_at' => now()->subHours(3),
+            'updated_at' => now()->subHours(2),
+        ]);
+
+        Ticket::factory()->count(2)->create([
+            'requester_id' => $otherEmployee->id,
+            'department_id' => $otherDepartment->id,
+            'category_id' => $category->id,
+            'template_key' => 'scanner_issue',
+            'location' => 'Packing Lane',
+            'status' => 'in_progress',
+            'title' => 'Unmanaged scanner blocker',
+            'created_at' => now()->subHours(3),
+            'updated_at' => now()->subHours(2),
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSeeText('Prevention Watch')
+            ->assertSeeText('Repeat Issue Clusters')
+            ->assertSeeText('Scanner Support · Scanner issue')
+            ->assertSeeText('Dock 4')
+            ->assertDontSeeText('Packing Lane');
+    }
+
+    public function test_ops_manager_prevention_watch_uses_site_wide_pressure(): void
+    {
+        $inbound = Department::factory()->create(['name' => 'Inbound']);
+        $outbound = Department::factory()->create(['name' => 'Outbound']);
+        $opsManager = User::factory()->create(['role' => 'ops_manager']);
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'primary_department_id' => $outbound->id,
+        ]);
+        $category = Category::factory()->create(['name' => 'Facilities']);
+
+        DepartmentMetric::factory()->create([
+            'department_id' => $inbound->id,
+            'metric_date' => now()->toDateString(),
+        ]);
+
+        Ticket::factory()->count(2)->create([
+            'requester_id' => $employee->id,
+            'department_id' => $outbound->id,
+            'category_id' => $category->id,
+            'template_key' => 'facilities_issue',
+            'location' => 'Gate B',
+            'status' => 'in_progress',
+            'sla_resolution_breached' => true,
+            'title' => 'Outbound gate blocker',
+            'created_at' => now()->subHours(60),
+            'updated_at' => now()->subHours(1),
+        ]);
+
+        $this->actingAs($opsManager)
+            ->get(route('home'))
+            ->assertOk()
+            ->assertSeeText('Site-wide · 14 days')
+            ->assertSeeText('Prevention Watch')
+            ->assertSeeText('Outbound')
+            ->assertSeeText('Gate B')
+            ->assertSeeText('Breach And Aging Risks')
+            ->assertSeeText('Outbound gate blocker');
+    }
+
     public function test_manager_benchmark_resolution_hours_are_clamped_to_sane_range(): void
     {
         $department = Department::factory()->create();

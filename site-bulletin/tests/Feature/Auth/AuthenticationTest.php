@@ -33,11 +33,26 @@ class AuthenticationTest extends TestCase
             'primary_department_id' => $department->id,
         ]);
 
+        User::factory()->opsManager()->create([
+            'name' => 'Site Ops Manager',
+        ]);
+
+        User::factory()->hr()->create([
+            'name' => 'HR Manager',
+        ]);
+
+        User::factory()->admin()->create([
+            'name' => 'Admin User',
+        ]);
+
         $this->get('/login')
             ->assertOk()
             ->assertSee('Quick Demo Access')
             ->assertSee('Enter as Employee')
-            ->assertSee('Enter as Manager');
+            ->assertSee('Enter as Manager')
+            ->assertSee('Enter as Ops Manager')
+            ->assertSee('Enter as HR')
+            ->assertSee('Enter as Admin');
     }
 
     public function test_users_can_authenticate_using_the_login_screen(): void
@@ -51,6 +66,34 @@ class AuthenticationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_manager_can_authenticate_using_the_login_screen(): void
+    {
+        $manager = User::factory()->manager()->create([
+            'email' => 'manager@example.com',
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'manager@example.com',
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticatedAs($manager);
+        $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_manager_can_access_manager_only_pages_after_login(): void
+    {
+        $manager = User::factory()->manager()->create();
+
+        $this->actingAs($manager)
+            ->get(route('analytics.index'))
+            ->assertOk();
+
+        $this->actingAs($manager)
+            ->get(route('filament.admin.pages.dashboard'))
+            ->assertOk();
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void

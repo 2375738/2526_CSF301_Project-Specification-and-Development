@@ -21,6 +21,10 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::get('demo-login', fn () => redirect()
+        ->route('login')
+        ->with('status', 'Demo access starts from the login page.'))
+        ->name('demo.login.show');
     Route::post('demo-login', [AuthenticatedSessionController::class, 'demoStore'])
         ->name('demo.login');
 

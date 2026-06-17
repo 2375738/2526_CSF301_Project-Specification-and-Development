@@ -67,7 +67,45 @@
       </div>
     @endif
 
+    @if (($employeeTicketTabs ?? collect())->isNotEmpty())
+      <section class="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">My Ticket Flow</p>
+            <h2 class="mt-1 text-base font-semibold text-slate-900">Track what needs you and what is with the team</h2>
+          </div>
+          <a href="{{ route('tickets.create') }}" class="text-sm font-semibold text-blue-600 hover:underline">Report another issue</a>
+        </div>
+
+        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          @foreach ($employeeTicketTabs as $tab)
+            @php
+              $tabHref = route('tickets.index', array_filter([
+                  'queue' => $tab['key'] === 'all' ? null : $tab['key'],
+                  'search' => $filters['search'] ?? null,
+                  'category_id' => $filters['category_id'] ?? null,
+              ], fn ($value) => $value !== null && $value !== ''));
+            @endphp
+            <a
+              href="{{ $tabHref }}"
+              class="rounded-xl border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm {{ $tab['active'] ? 'border-blue-300 bg-blue-50 text-blue-950' : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-blue-200 hover:bg-blue-50' }}"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-semibold">{{ $tab['label'] }}</span>
+                <span class="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">{{ $tab['count'] }}</span>
+              </div>
+              <p class="mt-2 text-xs leading-5 text-slate-500">{{ $tab['description'] }}</p>
+            </a>
+          @endforeach
+        </div>
+      </section>
+    @endif
+
     <form method="GET" action="{{ route('tickets.index') }}" class="bg-white shadow-sm rounded-xl px-6 py-4 flex flex-wrap items-center gap-3">
+      @if (! empty($filters['queue']) && ($filters['queue'] ?? 'all') !== 'all')
+        <input type="hidden" name="queue" value="{{ $filters['queue'] }}">
+      @endif
+
       <label class="flex-1 min-w-[160px] text-sm text-slate-600">
         <span class="sr-only">Search</span>
         <input type="search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Search tickets..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500" />

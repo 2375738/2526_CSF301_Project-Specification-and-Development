@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Announcement;
 use App\Models\Department;
 use App\Models\User;
+use App\Services\RoleScopeService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,10 @@ use Illuminate\View\View;
 
 class AnnouncementController extends Controller
 {
+    public function __construct(protected RoleScopeService $roleScope)
+    {
+    }
+
     public function index(Request $request): View
     {
         $user = $request->user();
@@ -316,7 +321,7 @@ class AnnouncementController extends Controller
 
     protected function audienceOptions(User $user): array
     {
-        if ($user->hasRole('hr', 'admin')) {
+        if ($this->roleScope->canManageAllDepartments($user)) {
             return [
                 'all' => 'All Departments',
                 'department' => 'Specific Department',
@@ -331,21 +336,6 @@ class AnnouncementController extends Controller
 
     protected function departmentOptions(User $user)
     {
-        if ($user->hasRole('hr', 'admin')) {
-            return Department::query()
-                ->orderBy('name')
-                ->pluck('name', 'id');
-        }
-
-        if ($user->isManager()) {
-            return $user->managedDepartments()
-                ->orderBy('departments.name')
-                ->pluck('departments.name', 'departments.id');
-        }
-
-        return Department::query()
-            ->whereIn('id', $user->departmentIds())
-            ->orderBy('name')
-            ->pluck('name', 'id');
+        return $this->roleScope->departmentOptionsForManagement($user);
     }
 }

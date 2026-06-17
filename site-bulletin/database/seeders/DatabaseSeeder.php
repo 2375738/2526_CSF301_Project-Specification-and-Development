@@ -80,6 +80,19 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+        $opsManager = User::updateOrCreate(
+            ['email' => 'ops@example.com'],
+            [
+                'name' => 'Ops Manager',
+                'password' => Hash::make('password'),
+                'role' => 'ops_manager',
+                'job_title' => 'Site Operations Manager',
+                'employee_id' => '10000005',
+                'location' => 'Operations Command Desk',
+                'phone' => '+1 (555) 000-0005',
+            ]
+        );
+
         $emp = User::updateOrCreate(
             ['email' => 'employee@example.com'],
             [
@@ -110,10 +123,12 @@ class DatabaseSeeder extends Seeder
         $assignDepartment($admin, $inbound, 'manager', true); // Admin technically oversees everything, but primary here
         $assignDepartment($hr, $support ?? $inbound, 'hr_manager', true);
         $assignDepartment($mgr, $inbound, 'manager', true);
+        $assignDepartment($opsManager, $inbound, 'manager', true);
         $assignDepartment($emp, $inbound, 'member', true);
 
         // Reporting Lines for Key Users
         ManagerRelationship::updateOrCreate(['manager_id' => $mgr->id, 'reports_to_id' => $admin->id], ['relationship_type' => 'direct']);
+        ManagerRelationship::updateOrCreate(['manager_id' => $opsManager->id, 'reports_to_id' => $admin->id], ['relationship_type' => 'direct']);
         ManagerRelationship::updateOrCreate(['manager_id' => $emp->id, 'reports_to_id' => $mgr->id], ['relationship_type' => 'direct']);
         ManagerRelationship::updateOrCreate(['manager_id' => $hr->id, 'reports_to_id' => $admin->id], ['relationship_type' => 'direct']);
 

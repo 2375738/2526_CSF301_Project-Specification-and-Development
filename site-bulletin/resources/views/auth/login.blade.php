@@ -4,11 +4,11 @@
 
     <div class="space-y-6">
         @if (($demoLoginEnabled ?? false) && ($demoPresets ?? collect())->isNotEmpty())
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
                 <div class="space-y-1">
                     <h2 class="text-base font-semibold text-slate-900">Quick Demo Access</h2>
                     <p class="text-sm text-slate-600">
-                        Enter with a seeded account first, or use the custom selector below for department-specific checks.
+                        Enter as any seeded role, or use the custom selector below for department-specific employee and manager checks.
                     </p>
                 </div>
 
@@ -22,7 +22,7 @@
                             @endif
                             <button
                                 type="submit"
-                                class="flex min-h-[88px] w-full flex-col items-start justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
+                                class="flex min-h-[88px] w-full flex-col items-start justify-center rounded-lg border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
                             >
                                 <span class="text-sm font-semibold text-slate-900">Enter as {{ $preset['label'] }}</span>
                                 <span class="mt-1 text-sm text-slate-600">{{ $preset['name'] }}</span>
@@ -83,7 +83,7 @@
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <h2 class="text-sm font-semibold text-slate-900">Custom Demo Role</h2>
                 <p class="mt-1 text-xs text-slate-600">
-                    Select role and department to enter the app without manual credentials.
+                    Select role and department to enter the app without manual credentials. Department applies to employee and manager demos.
                 </p>
                 <form method="POST" action="{{ route('demo.login') }}" class="mt-4 space-y-3">
                     @csrf
@@ -97,6 +97,9 @@
                         >
                             <option value="employee" @selected(old('role') === 'employee')>Employee</option>
                             <option value="manager" @selected(old('role') === 'manager')>Manager</option>
+                            <option value="ops_manager" @selected(old('role') === 'ops_manager')>Ops Manager</option>
+                            <option value="hr" @selected(old('role') === 'hr')>HR</option>
+                            <option value="admin" @selected(old('role') === 'admin')>Admin</option>
                         </select>
                         <x-input-error :messages="$errors->get('role')" class="mt-2" />
                     </div>
