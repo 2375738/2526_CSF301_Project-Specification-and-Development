@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Console\Commands\BackfillDemoOperationsData;
 use App\Console\Commands\RecalculateDepartmentMetrics;
+use App\Console\Commands\RollupPerformanceSamples;
 use App\Console\Commands\RecalculateTicketSLA;
 use App\Console\Commands\SendAnalyticsDigest;
 use App\Console\Commands\SystemReadinessCheck;
@@ -16,6 +17,7 @@ class Kernel extends ConsoleKernel
         BackfillDemoOperationsData::class,
         RecalculateTicketSLA::class,
         RecalculateDepartmentMetrics::class,
+        RollupPerformanceSamples::class,
         SendAnalyticsDigest::class,
         SystemReadinessCheck::class,
     ];
@@ -26,6 +28,7 @@ class Kernel extends ConsoleKernel
             $schedule->command('demo:backfill-ops-data')->everyFifteenMinutes();
         }
 
+        $schedule->command('performance:rollup-samples --days=8')->hourlyAt(10);
         $schedule->command('tickets:recalculate-sla')->dailyAt('00:30');
         $schedule->command('analytics:recalculate-departments')->dailyAt('01:00');
         $schedule->command('analytics:send-digest')->weekdays()->at('07:00');

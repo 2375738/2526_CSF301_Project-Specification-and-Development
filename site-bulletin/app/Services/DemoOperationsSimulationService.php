@@ -4,12 +4,18 @@ namespace App\Services;
 
 use App\Models\PerformanceSample;
 use App\Models\PerformanceSnapshot;
+use App\Models\PerformanceRollup;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class DemoOperationsSimulationService
 {
+    public function __construct(
+        protected PerformanceRollupService $rollups
+    ) {
+    }
+
     public function ensureFreshSamples(?Carbon $reference = null, int $historyWeeks = 6): array
     {
         $end = $this->alignToQuarterHour($reference ?? now());
@@ -41,6 +47,7 @@ class DemoOperationsSimulationService
 
         PerformanceSnapshot::query()->delete();
         PerformanceSample::query()->delete();
+        PerformanceRollup::query()->delete();
 
         return $this->generateRange($start, $end);
     }
@@ -128,6 +135,8 @@ class DemoOperationsSimulationService
         }
 
         $this->refreshSnapshotsForWeeks($users, $start, $end, $now);
+        $this->rollups->refreshRange($start, $end);
+
         return [
             'mode' => 'backfill',
             'start' => $start->toDateTimeString(),

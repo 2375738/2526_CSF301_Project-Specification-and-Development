@@ -30,12 +30,16 @@ The app supports role-based experiences for:
 ### Performance Simulation
 - Employee productivity and quality are stored as deterministic 15-minute `performance_samples`.
 - Weekly `performance_snapshots` are derived from those samples.
+- Hourly and daily `performance_rollups` aggregate raw samples for dashboard chart queries, keeping chart reads small as raw telemetry grows.
 - Dashboard trend windows use the same base source:
-  - `Last 7 days` = daily aggregation
-  - `Last 24 hours` = intraday aggregation
-  - `Last 3 hours` = short-window 15-minute points
+  - `Last 7 days` = daily rollups
+  - `Last 24 hours` = hourly rollups grouped into intraday buckets
+  - `Last 3 hours` = short-window 15-minute raw samples
 - Demo data can be refreshed to current local time with:
   - `php artisan demo:backfill-ops-data`
+- Rollups can be rebuilt or used before raw-sample retention with:
+  - `php artisan performance:rollup-samples --days=8`
+  - `php artisan performance:rollup-samples --start="2026-03-01 00:00:00" --end="2026-06-17 23:59:59" --prune-raw-after-days=90`
 
 ### Announcements
 - Audience targeting for `all`, department-scoped, and leadership-focused content.
@@ -147,6 +151,7 @@ php artisan schedule:run
 
 Relevant scheduled commands include:
 - `demo:backfill-ops-data`
+- `performance:rollup-samples`
 - `tickets:recalculate-sla`
 - `analytics:recalculate-departments`
 - `analytics:send-digest`
@@ -171,6 +176,7 @@ If `SITE_BULLETIN_DEMO_LOGIN_ENABLED` is unset, demo login remains available in 
 
 ### Performance
 - `performance_samples`: 15-minute base source of truth
+- `performance_rollups`: hourly/daily aggregates used for scalable chart reads
 - `performance_snapshots`: weekly derived rollups
 
 ### SLA

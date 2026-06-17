@@ -27,7 +27,8 @@ class DashboardDataService
         protected RoleScopeService $roleScope,
         protected RoleActionService $roleActionService,
         protected OperationalPreventionService $operationalPrevention,
-        protected HrWorkspaceService $hrWorkspaceService
+        protected HrWorkspaceService $hrWorkspaceService,
+        protected PerformanceRollupService $performanceRollups
     ) {
     }
 
@@ -963,6 +964,24 @@ class DashboardDataService
             ];
         }
 
+        if ($this->performanceRollups->hasRollupsForUsers($userIds)) {
+            $series = $this->performanceRollups->seriesForUsers($userIds);
+            $series['3h'] = $this->buildThreeHourRawSampleSeriesForUsers($userIds);
+
+            if ($series['24h']->isEmpty()) {
+                $rawSeries = $this->buildRawSampleSeriesForUsers($userIds);
+                $series['24h'] = $rawSeries['24h'];
+                $series['3h'] = $series['3h']->isEmpty() ? $rawSeries['3h'] : $series['3h'];
+            }
+
+            return $series;
+        }
+
+        return $this->buildRawSampleSeriesForUsers($userIds);
+    }
+
+    protected function buildRawSampleSeriesForUsers(array $userIds): array
+    {
         $samples = PerformanceSample::query()
             ->whereIn('user_id', $userIds)
             ->where('recorded_at', '>=', now()->subDays(7))
@@ -1043,6 +1062,35 @@ class DashboardDataService
             '24h' => $last24,
             '3h' => $last3,
         ];
+    }
+
+    protected function buildThreeHourRawSampleSeriesForUsers(array $userIds): \Illuminate\Support\Collection
+    {
+        $samples = PerformanceSample::query()
+            ->whereIn('user_id', $userIds)
+            ->where('recorded_at', '>=', now()->subHours(3))
+            ->orderBy('recorded_at')
+            ->get();
+
+        if ($samples->isEmpty()) {
+            return collect();
+        }
+
+        return $samples
+            ->groupBy(fn (PerformanceSample $sample) => $sample->recorded_at?->copy()?->startOfMinute()->format('Y-m-d H:i:s'))
+            ->filter()
+            ->map(function ($group, $bucket) {
+                $time = Carbon::parse($bucket);
+
+                return [
+                    'label' => $time->format('H:i'),
+                    'productivity' => round((float) $group->avg('units_per_hour'), 1),
+                    'quality' => round((float) $group->avg('quality_score'), 1),
+                    'from_date' => $time->toDateString(),
+                    'to_date' => $time->toDateString(),
+                ];
+            })
+            ->values();
     }
 
     protected function departmentUserIds(int $departmentId): array

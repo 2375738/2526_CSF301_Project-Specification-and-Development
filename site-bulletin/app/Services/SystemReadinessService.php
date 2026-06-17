@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DepartmentMetric;
 use App\Models\ManagerRelationship;
+use App\Models\PerformanceRollup;
 use App\Models\PerformanceSample;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
@@ -26,6 +27,7 @@ class SystemReadinessService
             $this->checkEmployeesWithoutManagers(),
             $this->checkDepartmentMetrics(),
             $this->checkDemoSamples(),
+            $this->checkPerformanceRollups(),
         ]);
 
         return [
@@ -213,6 +215,29 @@ class SystemReadinessService
             'Demo sample freshness',
             'Latest demo sample is ' . $latest->recorded_at?->diffForHumans() . '.',
             'Confirm demo:backfill-ops-data runs every fifteen minutes when demo simulation is enabled.'
+        );
+    }
+
+    protected function checkPerformanceRollups(): array
+    {
+        $latestSample = PerformanceSample::query()->latest('recorded_at')->first();
+        $latestRollup = PerformanceRollup::query()->latest('bucket_start')->first();
+
+        if (! $latestSample) {
+            return $this->check('ok', 'Performance rollups', 'No raw performance samples exist.', 'No action needed.');
+        }
+
+        if (! $latestRollup) {
+            return $this->check('warning', 'Performance rollups', 'Raw samples exist but no rollups have been generated.', 'Run php artisan performance:rollup-samples.');
+        }
+
+        $lagHours = $latestRollup->bucket_start?->diffInHours($latestSample->recorded_at, false) ?? 0;
+
+        return $this->check(
+            $lagHours > 3 ? 'warning' : 'ok',
+            'Performance rollups',
+            'Latest rollup bucket is ' . $latestRollup->bucket_start?->toDateTimeString() . '.',
+            'Confirm performance:rollup-samples runs hourly.'
         );
     }
 

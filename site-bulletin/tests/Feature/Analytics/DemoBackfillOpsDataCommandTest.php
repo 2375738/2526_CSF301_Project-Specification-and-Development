@@ -6,6 +6,7 @@ use App\Console\Commands\BackfillDemoOperationsData;
 use App\Models\Category;
 use App\Models\Department;
 use App\Models\PerformanceSample;
+use App\Models\PerformanceRollup;
 use App\Models\PerformanceSnapshot;
 use App\Models\Ticket;
 use App\Models\TicketStatusChange;
@@ -51,6 +52,8 @@ class DemoBackfillOpsDataCommandTest extends TestCase
         ]);
 
         $this->assertGreaterThan(0, PerformanceSample::query()->count());
+        $this->assertGreaterThan(0, PerformanceRollup::query()->where('bucket_type', 'hour')->count());
+        $this->assertGreaterThan(0, PerformanceRollup::query()->where('bucket_type', 'day')->count());
         $this->assertGreaterThan(0, PerformanceSnapshot::query()->count());
         $this->assertSame(0, PerformanceSample::query()->where('user_id', $manager->id)->count());
         $this->assertGreaterThan(0, Ticket::query()->whereNotNull('simulation_key')->count());

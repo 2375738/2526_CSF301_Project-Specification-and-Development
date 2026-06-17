@@ -2319,3 +2319,21 @@ Track what changed, why it changed, and what remains, without overloading `PARIT
   - `php artisan test`
   - `npm run build`
   - targeted Playwright smoke for guest login redirect, demo login, and authenticated dashboard shell
+
+## 2026-06-17 - Performance sample rollup pipeline
+- Scope: performance sample storage, dashboard chart queries, scheduled rollup command, readiness checks, and analytics tests.
+- Reason: raw 15-minute performance and quality samples grow quickly at production scale, so dashboard charts need compact pre-aggregated data rather than scanning raw telemetry indefinitely.
+- Change:
+  - added `performance_rollups` for hourly and daily aggregates
+  - added `PerformanceRollupService` and `performance:rollup-samples` for bounded day-by-day aggregation and optional raw-sample pruning
+  - updated demo backfill to generate rollups after sample creation
+  - routed dashboard 7-day and 24-hour chart reads through rollups while preserving raw 15-minute samples for the last-3-hour live window
+  - added readiness reporting for missing or stale rollups
+  - documented the data-processing path in the Laravel README
+- Validation:
+  - `php artisan test tests/Feature/Analytics/PerformanceRollupServiceTest.php tests/Feature/Analytics/DemoBackfillOpsDataCommandTest.php tests/Feature/DashboardTrendPanelsTest.php`
+  - `php artisan migrate --force`
+  - `php artisan performance:rollup-samples --days=60`
+  - `php artisan test`
+  - `npm run build`
+  - `php artisan site:readiness-check` (rollup check OK; expected local critical/warnings remain for APP_DEBUG, demo mode, log mailer, and storage link)
