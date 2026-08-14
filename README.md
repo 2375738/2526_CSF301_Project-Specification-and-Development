@@ -1,25 +1,25 @@
-# Repository Guide
+# Site Bulletin - Operations Portal
 
-This repository is intentionally narrowed to the Site Bulletin implementation work.
+A Laravel-based dissertation project modelling communication, ticketing, analytics and governance workflows in a fulfilment-centre environment.
 
-## Keep At Root
-- `AGENTS.md`
-- `CLEANUP_LOG.md`
-- `IMPLEMENTATION_LOG.md`
-- `README.md`
-- `site-bulletin/`
-- `data/` when referenced by the Laravel app
+## Engineering Highlights
 
-## Main Application
-The Laravel application lives in `site-bulletin/`.
+- Role-aware experiences for employee, manager, operations manager, HR and administrator users
+- Dashboards, announcements, direct and department messaging, and ticket-management workflows
+- SLA evaluation, status history, audit activity and governance approvals
+- Database migrations, seeded operational data, analytical rollups and scheduled commands
+- PHPUnit feature tests for messaging, analytics, dashboards and navigation behaviour
 
-Start with:
-- [`site-bulletin/README.md`](c:\Users\kadet\Documents\2526_CSF301_Project Specification and Development\site-bulletin\README.md)
+## Technology
 
-## Purpose Of Root Docs
-- `AGENTS.md`: contributor operating rules
-- `CLEANUP_LOG.md`: repo cleanup history
-- `IMPLEMENTATION_LOG.md`: feature and UX change log
-- `README.md`: repo-level orientation only
+PHP 8.2, Laravel, Filament, Blade, SQL, PHPUnit, Playwright and Vite.
 
-Product-level setup and functionality documentation is kept inside `site-bulletin/README.md`.
+## Explore the Project
+
+- [Application source](site-bulletin/)
+- [Product overview, setup and test instructions](site-bulletin/README.md)
+- [Feature tests](site-bulletin/tests/)
+- [Database migrations and seeders](site-bulletin/database/)
+- [Implementation history](IMPLEMENTATION_LOG.md)
+
+The application is intended as a local portfolio demonstration. Demo accounts and setup instructions are documented in the application README.
